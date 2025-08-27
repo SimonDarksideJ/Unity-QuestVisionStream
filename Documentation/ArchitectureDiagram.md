@@ -1,5 +1,13 @@
 # Architecture Diagram & Component Responsibilities
 
+## Documentation Navigation
+
+- [End-to-End Overview](EndToEndOverview.md)
+- (You are here) Architecture & Diagrams
+- [Unity Client Component](UnityClient.md)
+- [Server Component](QuestVisionStreamServer.md)
+- [Message Transmission & Schemas](MessageTransmissionGuide.md)
+
 ## System Diagram
 
 ```text
@@ -76,9 +84,9 @@ flowchart LR
  class F,G,H,I server;
 ```
 
- ## Mermaid Sequence Diagram (End-to-End Flow)
+## Mermaid Sequence Diagram (End-to-End Flow)
 
- ```mermaid
+```mermaid
  sequenceDiagram
   autonumber
   participant Unity as Unity Client<br/>PCAVideoStreamer
@@ -124,10 +132,11 @@ flowchart LR
    Server-->>Bridge: connectionState=closed
    Bridge-->>Unity: OnPeerConnectionClosed
   end
- ```
+```
 
 ---
 For further details, see the other documentation files in this folder.
+Quick links: [Unity Client](UnityClient.md) | [Server](QuestVisionStreamServer.md) | [Messages](MessageTransmissionGuide.md) | [Overview](EndToEndOverview.md)
 
 ## Mermaid Sequence Diagram (Detections Focus)
 
