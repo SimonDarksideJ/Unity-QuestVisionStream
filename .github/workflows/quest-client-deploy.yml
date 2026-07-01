@@ -1,0 +1,353 @@
+# QuestVisionStream WebXR — build the IWSDK client and deploy it to Cloudflare Pages.
+#
+# Adapted from the "Pale Signal" reference workflow. The client lives in
+# V2/quest-client (a static Vite/IWSDK bundle).
+#
+# ─── THINGS YOU MAY WANT TO CHANGE ──────────────────────────────────────────────
+#   • HOME BRANCH (the feature's home; production on push, staging base on PR):
+#       currently  claude/yolo-streaming-unity-modernize-2stzq2
+#       appears in 3 places → on.pull_request.branches, on.push.branches, and the
+#       PROD_BRANCH env of deploy-production. Change all three together.
+#   • CLOUDFLARE PAGES PROJECTS:
+#       production → `questvisionstream`       (apex questvisionstream.pages.dev)
+#       staging    → `questvisionstream-test`  (apex questvisionstream-test.pages.dev)
+#   • DA.GD SHORT CODES: `questvisionstream` (prod) / `questvisionstreamtest` (staging).
+#   • OPTIONAL repo VARIABLE `QVS_DEFAULT_SERVER` (e.g. wss://your-server:3000): when
+#     set, it is baked into the share link/QR so scanning it connects straight to
+#     your signaling server. When unset, links open the app at the apex and you add
+#     ?server=wss://HOST:3000 yourself.
+#
+# Two ISOLATED Cloudflare Pages projects keep PR validation off the live site:
+#   - production → questvisionstream       — ONLY on push to the home branch
+#                  (a merged PR) or manual workflow_dispatch.
+#   - staging    → questvisionstream-test  — ONLY on pull_request. A PR can NEVER
+#                  deploy to `questvisionstream`, so it can't overwrite the live site.
+#
+# Deploy needs these repo secrets (deploy steps skip automatically when absent,
+# e.g. on fork PRs — see Documentation/Deployment-Cloudflare-Pages.md to create them):
+#   - CLOUDFLARE_API_TOKEN   (token with "Cloudflare Pages: Edit" permission)
+#   - CLOUDFLARE_ACCOUNT_ID  (your Cloudflare account id)
+
+name: QuestVisionStream WebXR Deploy
+
+on:
+  pull_request:
+    branches: [claude/yolo-streaming-unity-modernize-2stzq2]
+    # Build/deploy only when the CLIENT changes — not docs or editor config.
+    paths:
+      - "V2/quest-client/**"
+      - "!V2/quest-client/*.md"
+      - "!V2/quest-client/**/*.md"
+      - "!V2/quest-client/.vscode/**"
+      - ".github/workflows/quest-client-deploy.yml"
+  push:
+    branches: [claude/yolo-streaming-unity-modernize-2stzq2]
+    paths:
+      - "V2/quest-client/**"
+      - "!V2/quest-client/*.md"
+      - "!V2/quest-client/**/*.md"
+      - "!V2/quest-client/.vscode/**"
+      - ".github/workflows/quest-client-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: V2/quest-client
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build + gate (typecheck). Runs for every trigger; produces the dist artifact
+  # the deploy jobs consume. The client bundles the file-linked libraries
+  # (service-framework, com.questvisionstream) from source via Vite aliases, so a
+  # full repo checkout is all that's needed.
+  # ---------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: V2/quest-client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build (static Vite bundle → dist/)
+        run: npx vite build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: quest-client-dist
+          path: V2/quest-client/dist
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # PRODUCTION — push to the home branch (a merged PR) or manual dispatch.
+  # Publishes to project `questvisionstream` (the live apex). Never runs on PRs.
+  # ---------------------------------------------------------------------------
+  deploy-production:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Surfaced here so steps can gate on it (secrets can't be used directly in
+      # step `if:` conditions, but `env` can).
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: quest-client-dist
+          path: V2/quest-client/dist
+
+      - name: Ensure the Cloudflare Pages project + production branch
+        # Create the project if missing, otherwise pin its production branch to the
+        # home branch — via the Cloudflare API (idempotent).
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: questvisionstream
+          PROD_BRANCH: claude/yolo-streaming-unity-modernize-2stzq2
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects"
+          code="$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${api}/${PROJECT}")"
+          if [ "$code" = "200" ]; then
+            echo "Project ${PROJECT} exists — pinning production branch to ${PROD_BRANCH}"
+            resp="$(curl -fsS -X PATCH "${api}/${PROJECT}" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" \
+              --data "{\"production_branch\":\"${PROD_BRANCH}\"}")"
+          elif [ "$code" = "404" ]; then
+            echo "Project ${PROJECT} missing — creating with production branch ${PROD_BRANCH}"
+            resp="$(curl -fsS -X POST "${api}" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" \
+              --data "{\"name\":\"${PROJECT}\",\"production_branch\":\"${PROD_BRANCH}\"}")"
+          else
+            echo "::error::Unexpected HTTP ${code} querying the Pages project."
+            exit 1
+          fi
+          if [ "$(printf '%s' "$resp" | jq -r '.success')" != "true" ]; then
+            echo "::error::Cloudflare API call failed."
+            printf '%s\n' "$resp" | jq . 2>/dev/null || printf '%s\n' "$resp"
+            exit 1
+          fi
+          echo "Production branch is now: $(printf '%s' "$resp" | jq -r '.result.production_branch')"
+
+      - name: Deploy to Cloudflare Pages (production)
+        id: deploy
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: V2/quest-client
+          command: >-
+            pages deploy dist
+            --project-name=questvisionstream
+            --branch=${{ github.ref_name }}
+            --commit-dirty=true
+
+      - name: Publish short code + QR for the Quest
+        # da.gd custom code `questvisionstream` stays constant across releases and
+        # points at the apex (with ?server=<QVS_DEFAULT_SERVER> baked in when that
+        # repo variable is set — appending a query to a short code is dropped by the
+        # redirect, so it must live in the TARGET).
+        if: steps.deploy.outcome == 'success'
+        env:
+          APEX_URL: https://questvisionstream.pages.dev
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+          DEFAULT_SERVER: ${{ vars.QVS_DEFAULT_SERVER }}
+        run: |
+          set -uo pipefail
+          DIAG=""
+          note() { echo "[shortcode] $*"; DIAG="${DIAG}$*"$'\n'; }
+          # Bake the signaling server into the target when provided.
+          if [ -n "${DEFAULT_SERVER}" ]; then
+            TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"
+          else
+            TARGET="${APEX_URL}"
+          fi
+          SHORT=""; SOURCE="apex"
+          shorten() {
+            local URL="$1" alias="$2" enc final resp
+            enc="$(jq -rn --arg u "$URL" '$u|@uri')"
+            resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${alias}" 2>&1)" || true
+            note "da.gd custom '${alias}': ${resp}"
+            if [ "$resp" = "https://da.gd/${alias}" ]; then
+              SHORT="https://da.gd/${alias}"; SOURCE="custom-created"; return
+            fi
+            SHORT="https://da.gd/${alias}"; SOURCE="reused (expected)"
+            final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://da.gd/${alias}" 2>/dev/null || true)"
+            if [ -n "$final" ] && ! printf '%s' "$final" | grep -qF "$URL"; then
+              SOURCE="reused (TARGET MISMATCH - recreate alias)"
+              note "WARNING: ${alias} resolves to '${final}', expected '${URL}'."
+            fi
+          }
+          shorten "$TARGET" "questvisionstream"
+          OPEN="${SHORT:-$TARGET}"
+          disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
+          note "OPEN: ${OPEN} (${SOURCE})"
+          echo "::notice title=QuestVisionStream short code::${DIAG//$'\n'/%0A}"
+          qrenc="$(jq -rn --arg u "$OPEN" '$u|@uri')"
+          {
+            echo "## QuestVisionStream WebXR (PRODUCTION) — open on your Quest"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| **Open** | [\`$(disp "$OPEN")\`](${OPEN}) |"
+            if [ -z "${DEFAULT_SERVER}" ]; then
+              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the apex |"
+            fi
+            echo "| **Stable URL** | [\`${APEX_URL}\`](${APEX_URL}) |"
+            echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
+            echo ""
+            echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # STAGING — pull_request only. Publishes to the ISOLATED `questvisionstream-test`
+  # project (apex questvisionstream-test.pages.dev), plus a best-effort smoke check.
+  # Cannot touch `questvisionstream`.
+  # ---------------------------------------------------------------------------
+  deploy-staging:
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: quest-client-dist
+          path: V2/quest-client/dist
+
+      - name: Ensure the staging Pages project (questvisionstream-test)
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: questvisionstream-test
+          PROD_BRANCH: staging
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects"
+          code="$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "${api}/${PROJECT}")"
+          if [ "$code" = "200" ]; then
+            echo "Project ${PROJECT} exists — pinning production branch to ${PROD_BRANCH}"
+            resp="$(curl -fsS -X PATCH "${api}/${PROJECT}" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" \
+              --data "{\"production_branch\":\"${PROD_BRANCH}\"}")"
+          elif [ "$code" = "404" ]; then
+            echo "Project ${PROJECT} missing — creating with production branch ${PROD_BRANCH}"
+            resp="$(curl -fsS -X POST "${api}" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" \
+              --data "{\"name\":\"${PROJECT}\",\"production_branch\":\"${PROD_BRANCH}\"}")"
+          else
+            echo "::error::Unexpected HTTP ${code} querying the staging Pages project."
+            exit 1
+          fi
+          if [ "$(printf '%s' "$resp" | jq -r '.success')" != "true" ]; then
+            echo "::error::Cloudflare API call failed."
+            printf '%s\n' "$resp" | jq . 2>/dev/null || printf '%s\n' "$resp"
+            exit 1
+          fi
+          echo "Staging production branch is now: $(printf '%s' "$resp" | jq -r '.result.production_branch')"
+
+      - name: Deploy to Cloudflare Pages (staging)
+        id: deploy
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: V2/quest-client
+          # --branch=staging == the staging project's production branch, so it
+          # lands on the stable apex questvisionstream-test.pages.dev.
+          command: >-
+            pages deploy dist
+            --project-name=questvisionstream-test
+            --branch=staging
+            --commit-dirty=true
+
+      - name: Smoke check
+        # Best-effort: confirm the staging deploy serves index.html. A brand-new
+        # Pages project needs a few seconds for TLS/DNS, so we retry — and only WARN
+        # on failure (the deploy itself is the deliverable; we must not red the PR
+        # over propagation lag). Do NOT enable `-e` — a transient curl error must
+        # not abort the step.
+        if: steps.deploy.outcome == 'success'
+        continue-on-error: true
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -u
+          echo "Smoke-testing ${DEPLOY_URL}"
+          page="000"
+          for i in 1 2 3 4 5 6; do
+            page="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${DEPLOY_URL}/" || echo "000")"
+            [ "$page" = "200" ] && break
+            echo "  attempt ${i}: index HTTP ${page} — waiting for propagation…"
+            sleep 5
+          done
+          echo "  index.html -> HTTP ${page}"
+          if [ "$page" = "200" ]; then
+            echo "✅ staging deploy healthy"
+          else
+            echo "::warning title=Staging smoke check::index=${page} (expected 200). Likely first-deploy TLS/propagation lag — the deploy itself succeeded; re-run or check ${DEPLOY_URL} directly."
+          fi
+
+      - name: Publish staging short code + QR
+        if: steps.deploy.outcome == 'success'
+        env:
+          APEX_URL: https://questvisionstream-test.pages.dev
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+          DEFAULT_SERVER: ${{ vars.QVS_DEFAULT_SERVER }}
+        run: |
+          set -uo pipefail
+          if [ -n "${DEFAULT_SERVER}" ]; then
+            TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"
+          else
+            TARGET="${APEX_URL}"
+          fi
+          enc="$(jq -rn --arg u "$TARGET" '$u|@uri')"
+          resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=questvisionstreamtest" 2>&1)" || true
+          if [ "$resp" = "https://da.gd/questvisionstreamtest" ]; then SHORT="$resp"; else SHORT="https://da.gd/questvisionstreamtest"; fi
+          OPEN="${SHORT:-$TARGET}"
+          disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
+          qrenc="$(jq -rn --arg u "$OPEN" '$u|@uri')"
+          {
+            echo "## QuestVisionStream WebXR (STAGING — questvisionstream-test) — safe to test"
+            echo ""
+            echo "> This PR deployed to the **isolated** \`questvisionstream-test\` project. The"
+            echo "> live site \`questvisionstream.pages.dev\` was **not** touched."
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| **Open** | [\`$(disp "$OPEN")\`](${OPEN}) |"
+            if [ -z "${DEFAULT_SERVER}" ]; then
+              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the apex |"
+            fi
+            echo "| **Staging URL** | [\`${APEX_URL}\`](${APEX_URL}) |"
+            echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
+            echo ""
+            echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
+          } >> "$GITHUB_STEP_SUMMARY"

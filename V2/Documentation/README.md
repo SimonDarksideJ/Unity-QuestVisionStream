@@ -9,6 +9,11 @@ Guides and deployment references for the V2 stack.
   GPU (Metal/MPS), and expose it externally (Tailscale / Cloudflare Tunnel / Caddy
   / router port-forward, plus TURN for WebRTC media across NAT).
 
+- **[Deployment-Cloudflare-Pages.md](Deployment-Cloudflare-Pages.md)** — deploy the
+  WebXR client to Cloudflare Pages (isolated production + staging projects) via
+  GitHub Actions, with per-deploy summary + short code + QR. Preparation checklist
+  for the `CLOUDFLARE_*` secrets.
+
 - **examples/**
   - [`com.questvisionstream.plist`](examples/com.questvisionstream.plist) —
     launchd LaunchAgent to run the server as an auto-starting background service
