@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd LaunchAgent for QuestVisionStreamServer on Apple Silicon.
+
+  Runs the server with the MPS environment (full unified memory + GPU) and your
+  tuning vars, auto-starting at login and restarting if it exits.
+
+  Setup:
+    1. Edit the ABSOLUTE paths below:
+         - WorkingDirectory  -> your .../V2/QuestVisionStreamServer
+         - Program path      -> that dir's .venv/bin/python
+    2. Adjust EnvironmentVariables (detector, imgsz, TURN, etc.).
+    3. cp this file to ~/Library/LaunchAgents/
+    4. launchctl load ~/Library/LaunchAgents/com.questvisionstream.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.questvisionstream.server</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/YOU/path/to/V2/QuestVisionStreamServer</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/YOU/path/to/V2/QuestVisionStreamServer/.venv/bin/python</string>
+    <string>-m</string>
+    <string>questvisionstream</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Apple Silicon: use the GPU and the full unified memory pool -->
+    <key>PYTORCH_ENABLE_MPS_FALLBACK</key>
+    <string>1</string>
+    <key>PYTORCH_MPS_HIGH_WATERMARK_RATIO</key>
+    <string>0.0</string>
+
+    <!-- Server config -->
+    <key>QVS_DETECTOR</key>
+    <string>yolo</string>
+    <key>QVS_ENABLE_DISPLAY</key>
+    <string>false</string>
+    <key>QVS_HOST</key>
+    <string>0.0.0.0</string>
+    <key>QVS_PORT</key>
+    <string>3000</string>
+    <key>QVS_HEALTH_PORT</key>
+    <string>8080</string>
+
+    <!-- Latency levers -->
+    <key>QVS_YOLO_IMGSZ</key>
+    <string>480</string>
+    <key>QVS_YOLO_HALF</key>
+    <string>true</string>
+
+    <!-- Remote/NAT: uncomment to relay media via TURN (not needed on LAN/Tailscale)
+    <key>QVS_ENABLE_TURN</key>
+    <string>true</string>
+    <key>QVS_TURN_URLS</key>
+    <string>turn:your.turn.host:3478</string>
+    <key>QVS_TURN_USERNAME</key>
+    <string>user</string>
+    <key>QVS_TURN_CREDENTIAL</key>
+    <string>pass</string>
+    -->
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/questvisionstream.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/questvisionstream.err</string>
+</dict>
+</plist>

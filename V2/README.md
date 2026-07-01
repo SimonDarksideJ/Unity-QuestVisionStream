@@ -16,8 +16,17 @@ V2/
 │                             #   file-linked into the Quest client.
 ├── quest-client/             # Meta IWSDK WebXR app (the new Quest client)
 │                             #   Thin host that wires the library into IWSDK's ECS.
-└── QuestVisionStreamServer/  # Modernized Python inference server.
+├── QuestVisionStreamServer/  # Modernized Python inference server.
+└── Documentation/            # Install + deployment guides (see below).
 ```
+
+## Documentation
+
+- **[Documentation/Install-Mac-M2.md](Documentation/Install-Mac-M2.md)** — run the
+  server natively on a Mac mini M2 (macOS 26.5) with full unified memory + GPU
+  (Metal/MPS), and expose it externally (Tailscale / Cloudflare Tunnel / Caddy /
+  router, plus TURN). Ready-to-use launchd + Cloudflare examples in
+  `Documentation/examples/`.
 
 Two "app" folders as requested — the **Quest client** and the updated
 **QuestVisionStreamServer** — plus the reusable **`com.questvisionstream`** library

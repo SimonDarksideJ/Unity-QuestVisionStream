@@ -1,0 +1,29 @@
+# Cloudflare Tunnel config for QuestVisionStreamServer.
+#
+# Exposes the signaling WebSocket over a public HTTPS/WSS hostname with no inbound
+# router ports. Carries signaling only — pair with a TURN server (see the guide,
+# §5.5) so WebRTC media can cross NAT.
+#
+# Prereqs (see Install-Mac-M2.md §5.2):
+#   cloudflared tunnel login
+#   cloudflared tunnel create questvisionstream        # note the tunnel UUID
+#   cloudflared tunnel route dns questvisionstream qvs.example.com
+#
+# Then edit the two values below and run:
+#   cloudflared tunnel --config cloudflared-config.yml run
+
+tunnel: questvisionstream                 # tunnel name (or UUID)
+credentials-file: /Users/YOU/.cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  # Signaling WebSocket -> local aiortc server. Cloudflare upgrades WS transparently.
+  - hostname: qvs.example.com
+    service: ws://localhost:3000
+
+  # (Optional) health endpoint at /health -> local 8080
+  - hostname: qvs.example.com
+    path: ^/health.*
+    service: http://localhost:8080
+
+  # Required catch-all.
+  - service: http_status:404
