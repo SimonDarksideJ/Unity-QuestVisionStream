@@ -1,38 +1,46 @@
 # QuestVisionStream V2 — Documentation
 
-Guides and deployment references for the V2 stack.
+The single hub for all V2 documentation. Everything below lives here under
+`Documentation/`; component packages keep only a short README that points back here.
 
-## Contents
-
-- **[Install-Mac-M2.md](Install-Mac-M2.md)** — install and run the streaming
-  service natively on a Mac mini M2 (macOS 26.5) using the full unified memory +
-  GPU (Metal/MPS), and expose it externally (Tailscale / Cloudflare Tunnel / Caddy
-  / router port-forward, plus TURN for WebRTC media across NAT).
-
-- **[Deployment-Cloudflare-Pages.md](Deployment-Cloudflare-Pages.md)** — deploy the
-  WebXR client to Cloudflare Pages (isolated production + staging projects) via
-  GitHub Actions, with per-deploy summary + short code + QR. Preparation checklist
-  for the `CLOUDFLARE_*` secrets, and where to set `QVS_SIGNALING_URL`.
+## Start here
 
 - **[Architecture-and-Hosting.md](Architecture-and-Hosting.md)** — the big picture:
-  components (client / library / service-framework / server), end-to-end data flow,
-  and the client + server hosting topology (LAN / Tailscale / tunnel / TURN).
+  components, end-to-end data flow, and where each half runs. Read this first.
+- **[../README.md](../README.md)** — V2 repo layout and build/run quickstart.
 
-- **[Configuration-and-Connectivity.md](Configuration-and-Connectivity.md)** — how
-  the client is configured (which server it dials), the WebRTC connection sequence,
-  ports, STUN/TURN, and a connectivity troubleshooting matrix.
+## Guides
 
-- **examples/**
-  - [`com.questvisionstream.plist`](examples/com.questvisionstream.plist) —
-    launchd LaunchAgent to run the server as an auto-starting background service
-    with the MPS environment.
+| Guide | What it covers |
+|-------|----------------|
+| [Configuration-and-Connectivity.md](Configuration-and-Connectivity.md) | How the client is configured (which server it dials), the WebRTC connection sequence, ports, STUN/TURN, and a connectivity troubleshooting matrix. |
+| [Install-Mac-M2.md](Install-Mac-M2.md) | Run the server natively on a Mac mini M2 (macOS 26.5) using the GPU + full unified memory (MPS), and expose it externally (Tailscale / Cloudflare Tunnel / Caddy / router + TURN). |
+| [Deploy-HuggingFace-Spaces.md](Deploy-HuggingFace-Spaces.md) | Run the server on Hugging Face Spaces (free cloud GPU). |
+| [Deployment-Cloudflare-Pages.md](Deployment-Cloudflare-Pages.md) | Deploy the WebXR client to Cloudflare Pages (isolated prod + staging) via GitHub Actions; create the `CLOUDFLARE_*` secrets; configure the server URL (KV binding / env var / `?server=`). |
+
+## Reference
+
+- **[IWSDK-API-Reference.md](IWSDK-API-Reference.md)** — source-verified `@iwsdk/core`
+  API snapshot the client was built against.
+- **examples/** — ready-to-use config:
+  - [`com.questvisionstream.plist`](examples/com.questvisionstream.plist) — launchd
+    LaunchAgent to run the server as a background service (MPS env baked in).
   - [`cloudflared-config.yml`](examples/cloudflared-config.yml) — Cloudflare Tunnel
-    config exposing signaling over WSS with no port-forwarding.
+    for `wss` signaling with no port-forwarding.
+  - [`Caddyfile.example`](examples/Caddyfile.example) — Caddy reverse proxy.
 
-## Related docs elsewhere in the repo
+## Component docs (package READMEs)
 
-- `../QuestVisionStreamServer/README.md` — server overview and every `QVS_*` var.
-- `../QuestVisionStreamServer/DEPLOY_LOCAL_MAC.md` — condensed native-macOS notes.
-- `../QuestVisionStreamServer/DEPLOY_HF_SPACES.md` — Hugging Face Spaces (cloud GPU).
-- `../QuestVisionStreamServer/deploy/Caddyfile.example` — Caddy reverse proxy.
-- `../README.md` — V2 architecture overview.
+- [`../README.md`](../README.md) — V2 overview & architecture.
+- [`../quest-client/README.md`](../quest-client/README.md) — the IWSDK WebXR client app.
+- [`../com.questvisionstream/README.md`](../com.questvisionstream/README.md) — the
+  reusable streaming library.
+- [`../QuestVisionStreamServer/README.md`](../QuestVisionStreamServer/README.md) —
+  the Python inference server (all `QVS_*` env vars).
+
+## Background / analysis (repo root)
+
+- [`../../EVALUATION.md`](../../EVALUATION.md) — evaluation that drove the V2 rebuild.
+- [`../../UNITY_REFERENCE_FEATURES.md`](../../UNITY_REFERENCE_FEATURES.md) — catalog of
+  Unity client-led features recreated in the WebXR client.
+- [`../../HANDOVER.md`](../../HANDOVER.md) — original modernization research notes.

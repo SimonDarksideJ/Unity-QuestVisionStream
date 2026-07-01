@@ -1,5 +1,7 @@
 # QuestVisionStream — WebXR Quest Client
 
+> 📖 Full docs hub: [`../Documentation/`](../Documentation/README.md).
+
 A **Meta IWSDK** (Immersive Web SDK, `@iwsdk/core`) WebXR app that recreates the
 Unity Quest client's behaviour in the browser. It captures passthrough camera
 frames, streams them to `QuestVisionStreamServer` over WebRTC, and renders
@@ -64,7 +66,8 @@ Configure the signaling target via `?server=ws://HOST:3000`, or
 
 - **Verified:** `tsc --noEmit` and a full `vite build` pass against the real
   `@iwsdk/core@0.4.2` + `three` — the World/System/Component/Camera API usage is
-  type-correct. See `IWSDK_API_REFERENCE.md` for the API this was built against.
+  type-correct. See [`../Documentation/IWSDK-API-Reference.md`](../Documentation/IWSDK-API-Reference.md)
+  for the API this was built against.
 - **Placement depth:** v1 places tags at a fixed distance along the detection ray.
   True surface anchoring (raycast the ray against IWSDK scene-understanding
   `XRMesh` / environment depth, mirroring Unity's `EnvironmentRaycast`) is the

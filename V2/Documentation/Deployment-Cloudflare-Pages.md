@@ -76,16 +76,58 @@ redeploy. That depends on which store you use:
 > the app is live*, use the **KV** option below.
 
 #### Option A — KV binding (live, no redeploy) — recommended if you change it often
-1. **Create a KV namespace:** Workers & Pages → **KV** → **Create namespace**
-   (e.g. `qvs-config`). (Or `npx wrangler@4 kv namespace create qvs-config`.)
-2. **Bind it to the project:** the project → **Settings → Bindings → Add → KV
-   namespace** → **Variable name `QVS_CONFIG`** → select `qvs-config` → for
-   **Production** (and Preview if wanted). Adding the binding needs **one** redeploy
-   to wire it up (Deployments → Retry deployment).
-3. **Set the value:** Workers & Pages → KV → `qvs-config` → **+ Entry** →
-   **Key `signaling_url`**, **Value `wss://your-host:3000`**. (Or
-   `npx wrangler@4 kv key put --binding QVS_CONFIG signaling_url "wss://host:3000"`.)
-4. **Change it anytime** by editing that KV entry — no redeploy. Reload the app.
+
+**What this is, in plain terms.** *Workers KV* is Cloudflare's tiny global
+key–value store. A *binding* is a named handle that exposes a KV namespace to your
+Pages Function as `context.env.<NAME>`. Our Function
+(`functions/api/config.js`) does `env.QVS_CONFIG.get('signaling_url')` — i.e. it
+reads the key `signaling_url` from the namespace bound as `QVS_CONFIG`, **on every
+request**. So changing that key's *value* changes what the app sees on its next
+reload — no rebuild, no redeploy. (Only *adding/removing the binding itself* needs
+one redeploy, because the binding is part of the deployment config.)
+
+```
+ app ──GET /api/config──▶ Pages Function ──env.QVS_CONFIG.get('signaling_url')──▶ KV
+                                    ◀── { "server": "wss://host:3000" } ──
+```
+
+**Step 1 — create a KV namespace** (a one-time container for the value):
+- Dashboard: **Workers & Pages → KV → Create a namespace** → name it e.g.
+  `qvs-config` → **Add**.
+- or CLI: `npx wrangler@4 kv namespace create qvs-config` (note the printed `id`).
+
+**Step 2 — bind the namespace to the Pages project** (this is the "Bindings"
+section you saw):
+- Dashboard: open the **`questvisionstream`** project (or `questvisionstream-test`)
+  → **Settings → Bindings → Add → KV namespace**.
+  - **Variable name:** `QVS_CONFIG`  ← must match exactly; this is the `env` key.
+  - **KV namespace:** select `qvs-config`.
+  - **Environment:** **Production** (and add it for **Preview** too if you want
+    preview deploys to read it).
+  - **Save.**
+- **Then redeploy once** so the binding is wired into a deployment: **Deployments →**
+  latest **→ ⋯ → Retry deployment**. (You only do this the first time you add the
+  binding.)
+
+**Step 3 — set the value** (the actual server URL):
+- Dashboard: **Workers & Pages → KV →** `qvs-config` **→ + Add entry** →
+  - **Key:** `signaling_url`
+  - **Value:** `wss://your-host:3000`
+  - **Add.**
+- or CLI:
+  `npx wrangler@4 kv key put --binding=QVS_CONFIG signaling_url "wss://your-host:3000"`
+  (from `V2/quest-client`, or add `--namespace-id=<id>` instead of `--binding`).
+
+**Step 4 — verify:**
+```bash
+curl https://questvisionstream.pages.dev/api/config      # {"server":"wss://your-host:3000"}
+```
+Then open the app on the Quest — it connects to that server.
+
+**Change it anytime** by editing the `signaling_url` value (Step 3) — the change is
+live within a few seconds (KV is eventually consistent); just **reload** the app.
+Production and staging use separate namespaces/values if you bind one to each
+project.
 
 #### Option B — env var (simplest; change = redeploy)
 1. Project → **Settings → Variables and Secrets** (this is the "env vars" section —

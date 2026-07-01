@@ -1,5 +1,7 @@
 # @questvisionstream/client
 
+> 📖 Full docs hub: [`../Documentation/`](../Documentation/README.md).
+
 Reusable, **host-agnostic** WebRTC streaming client for QuestVisionStream, built
 as a graph of [RealityCollective Service Framework](../service-framework)
 services. It speaks the exact protocol of `QuestVisionStreamServer` and exposes a

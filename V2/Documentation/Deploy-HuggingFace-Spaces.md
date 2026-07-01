@@ -10,7 +10,8 @@ Use a **Docker Space** (not the default Gradio SDK) so the WebRTC/WebSocket port
 are under your control.
 
 1. Create a Space → SDK: **Docker**.
-2. Add this server's files (`Dockerfile`, `requirements*.txt`, `questvisionstream/`).
+2. Add the server's files from [`../QuestVisionStreamServer/`](../QuestVisionStreamServer/)
+   (`Dockerfile`, `requirements*.txt`, `questvisionstream/`).
 3. Spaces exposes a single public port (`7860` by convention). Set:
    - `QVS_PORT=7860` (signaling on the public port), or run signaling on 7860 and
      drop the separate health port.

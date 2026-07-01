@@ -1,5 +1,7 @@
 # QuestVisionStreamServer (V2)
 
+> 📖 Full docs hub: [`../Documentation/`](../Documentation/README.md).
+
 Modernized, self-hostable inference server. Receives a WebRTC camera track from a
 client (Unity or the WebXR Quest client), runs a detector, and streams detections
 back over the `detections` data channel.
@@ -59,7 +61,10 @@ Health: `curl http://localhost:8080/` → `{"status":"ok","detector":"yolo","con
 | `QVS_YOLO_IMGSZ` / `QVS_YOLO_HALF` / `QVS_YOLO_CONF` | `640` / `false` / `0.6` | YOLO latency levers |
 | `QVS_YOLO_IGNORE` | people/vehicles | Classes to drop |
 
-See `DEPLOY_LOCAL_MAC.md` and `DEPLOY_HF_SPACES.md` for host-specific guidance.
+Host-specific guides live in the docs hub:
+[Install-Mac-M2](../Documentation/Install-Mac-M2.md) (native Apple Silicon + remote
+access) and [Deploy-HuggingFace-Spaces](../Documentation/Deploy-HuggingFace-Spaces.md)
+(free cloud GPU). Full index: [`../Documentation/`](../Documentation/README.md).
 
 ## Protocol
 

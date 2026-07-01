@@ -248,7 +248,7 @@ https://qvs.example.com/?server=wss://qvs.example.com
 
 Caddy auto‑provisions Let's Encrypt TLS and upgrades WebSockets transparently. A
 ready example lives at
-[`../QuestVisionStreamServer/deploy/Caddyfile.example`](../QuestVisionStreamServer/deploy/Caddyfile.example):
+[`examples/Caddyfile.example`](examples/Caddyfile.example):
 
 ```bash
 brew install caddy
@@ -338,6 +338,6 @@ uses the GPU + full unified memory exactly like `run-local.sh`.
 | First frames very slow | Expected — Metal shader compile + model load. It stabilises. |
 | Client can't reach `ws://` from an HTTPS page | Browsers block mixed content. Serve signaling over `wss://` (Cloudflare/Caddy/Tailscale‑serve). |
 
-See also `../QuestVisionStreamServer/README.md` (all `QVS_*` vars),
-`../QuestVisionStreamServer/DEPLOY_LOCAL_MAC.md`, and
-`../QuestVisionStreamServer/DEPLOY_HF_SPACES.md`.
+See also [`../QuestVisionStreamServer/README.md`](../QuestVisionStreamServer/README.md)
+(all `QVS_*` vars) and [`Deploy-HuggingFace-Spaces.md`](Deploy-HuggingFace-Spaces.md)
+(free cloud GPU).

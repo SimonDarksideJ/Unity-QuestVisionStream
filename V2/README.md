@@ -22,11 +22,12 @@ V2/
 
 ## Documentation
 
-- **[Documentation/Install-Mac-M2.md](Documentation/Install-Mac-M2.md)** — run the
-  server natively on a Mac mini M2 (macOS 26.5) with full unified memory + GPU
-  (Metal/MPS), and expose it externally (Tailscale / Cloudflare Tunnel / Caddy /
-  router, plus TURN). Ready-to-use launchd + Cloudflare examples in
-  `Documentation/examples/`.
+📖 **All documentation lives in one hub: [`Documentation/`](Documentation/README.md).**
+Start with [Architecture-and-Hosting](Documentation/Architecture-and-Hosting.md), then
+[Configuration-and-Connectivity](Documentation/Configuration-and-Connectivity.md),
+[Install-Mac-M2](Documentation/Install-Mac-M2.md) (server hosting) and
+[Deployment-Cloudflare-Pages](Documentation/Deployment-Cloudflare-Pages.md) (client
+hosting). Each component package keeps only a short README that links back to the hub.
 
 Two "app" folders as requested — the **Quest client** and the updated
 **QuestVisionStreamServer** — plus the reusable **`com.questvisionstream`** library
