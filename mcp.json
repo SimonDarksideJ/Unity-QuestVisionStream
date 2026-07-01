@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "iwsdk-runtime": {
+      "command": "npx",
+      "args": ["-y", "@iwsdk/reference"]
+    },
+    "iwsdk-reference": {
+      "command": "npx",
+      "args": ["-y", "@iwsdk/reference-assets"]
+    },
+    "hzdb": {
+      "command": "npx",
+      "args": ["-y", "@meta-quest/hzdb"]
+    }
+  }
+}
