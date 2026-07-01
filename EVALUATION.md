@@ -90,6 +90,12 @@ The handover's hosting decision is **sound and I concur**:
 
 ## 2. Unity client / package (`com.questvisionstream/`)
 
+> **Framing:** the IWSDK/TypeScript app is a **fresh recreation**, not a migration
+> or port of the Unity code. The Unity project is **reference only** — a source of
+> client-led behaviour to reproduce (box/label rendering, world placement, dedup,
+> qualifiers). A full per-scene feature catalog with WebXR mappings and recreation
+> priorities lives in **`UNITY_REFERENCE_FEATURES.md`**.
+
 ### What's actually here
 
 - **WebRTC is a compiled Android `.aar`** (`QuestVisionStreamPlugin-release.aar`
@@ -106,7 +112,7 @@ The handover's hosting decision is **sound and I concur**:
   a `minDistanceMeters` gate for multi-instance.
 - `QuestVisionStreamEvents.cs` — UnityEvent fan-out for connection/video/detections.
 
-### WebXR migration feasibility
+### WebXR recreation feasibility
 
 The handover's central distinction is **correct and is the crux of the whole
 migration**:
@@ -129,7 +135,7 @@ via WebXR hit-test + the IWSDK ECS (the equivalent of Unity's
 "typecheck-clean / protocol-exact." That code does not exist on any reachable ref.
 The WebXR/TS client is a **from-scratch rebuild**, not an iteration.
 
-### Migration plan (when green-lit)
+### Recreation plan (when green-lit)
 
 1. `npm create iwsdk` scaffold; TypeScript, strict.
 2. `QuestVisionStreamClient`: `getUserMedia` + `RTCPeerConnection` speaking the
