@@ -128,7 +128,7 @@ Key rules:
 
 | Concern | Where | Editable |
 |---------|-------|----------|
-| Which server the client dials | Cloudflare Pages env var `QVS_SIGNALING_URL` (via `/api/config`), or `?server=` | **Online**, no rebuild / per-open |
+| Which server the client dials | Pages KV `QVS_CONFIG`/`signaling_url` (live) or env var `QVS_SIGNALING_URL` (redeploy) via `/api/config`, or `?server=` | KV: live · env var: redeploy · `?server=`: per-open |
 | Client render knobs (camera res, invertY, placement, dedup) | `quest-client/src/config.ts` `AppConfig` | Build time |
 | Server host/port/detector/flips/ICE/TURN/YOLO levers | `QVS_*` env vars | Restart |
 | Client deploy (projects, branch, short codes) | `.github/workflows/quest-client-deploy.yml` | Repo |

@@ -33,14 +33,22 @@ Resolved at startup in `V2/quest-client/src/config.ts`, **first match wins**:
 | Priority | Source | Use it for |
 |---------:|--------|------------|
 | 1 | **`?server=` URL param** — `…/?server=wss://host:3000` | One-off tests / overriding everything |
-| 2 | **`/api/config`** — Cloudflare Pages Function returning the project env var `QVS_SIGNALING_URL` | **The normal way.** Editable online, per project, no rebuild |
+| 2 | **`/api/config`** — Pages Function returning a **KV** value (`QVS_CONFIG`/`signaling_url`, live) or the `QVS_SIGNALING_URL` env var (change = redeploy) | **The normal way.** Central, dashboard-managed, per project |
 | 3 | **`VITE_SIGNALING_URL`** — baked at build time | A compile-time default (optional) |
 | 4 | **`ws://localhost:3000`** | Local dev |
 
-**Recommended setup:** deploy once, then set `QVS_SIGNALING_URL` on each
-Cloudflare Pages project (Settings → **Variables and Secrets** → Plaintext). See
-[Deployment-Cloudflare-Pages.md §4](Deployment-Cloudflare-Pages.md#4-point-the-deployed-app-at-your-streaming-server-online-editable)
+**Recommended setup:** deploy once, then set the server centrally per project. Use
+a **KV binding** if you want to change it *while the app is live* (no redeploy — KV
+values are read at request time), or a plain **`QVS_SIGNALING_URL` env var** for
+the simple case (changing it needs a redeploy, since Pages bakes env vars into the
+deployment). See
+[Deployment-Cloudflare-Pages.md §4](Deployment-Cloudflare-Pages.md#4-point-the-deployed-app-at-your-streaming-server)
 for the exact clicks. Then the plain apex URL / QR "just works".
+
+> "**Kicking**" the app = **reloading the page** in the headset browser: startup
+> re-fetches `/api/config`, so a reload always re-reads the current config. (With a
+> plain env var, remember Cloudflare only serves the *new* value after a redeploy;
+> with KV it's live.)
 
 > **`wss://` vs `ws://`:** the deployed page is HTTPS, so browsers **block plain
 > `ws://`** as mixed content. Your server must be reachable over **`wss://`** (TLS)

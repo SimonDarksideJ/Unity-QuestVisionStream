@@ -57,35 +57,50 @@ secret**:
 Names must match **exactly** (the workflow reads `secrets.CLOUDFLARE_API_TOKEN`
 and `secrets.CLOUDFLARE_ACCOUNT_ID`).
 
-### 4. Point the deployed app at your streaming server (online-editable)
-This is **how the client knows which server to connect to** — see
-[How the app finds its server](#how-the-app-finds-its-server) for the full order.
-The recommended, online-editable way needs no rebuild.
+### 4. Point the deployed app at your streaming server
 
-**Exactly where in the dashboard** (the "env vars" you're looking for are called
-**Variables and Secrets** in the current UI):
+"**Kicking**" the app means **reloading the page** in the headset browser — that
+re-runs startup and re-fetches `/api/config`. So the client always picks up config
+on reload; the only question is whether Cloudflare serves the *new* value without a
+redeploy. That depends on which store you use:
 
-1. Cloudflare dashboard → **Workers & Pages** → click the **`questvisionstream`**
-   project (or `questvisionstream-test` for staging).
-2. **Settings** tab → **Variables and Secrets** (this is the env-var section —
-   *not* "Bindings", which is for KV/R2/D1; *not* "Runtime", which is compat flags).
-3. **+ Add** → Type **Plaintext** (not Secret) →
-   - **Variable name:** `QVS_SIGNALING_URL`
-   - **Value:** `wss://your-host:3000`
-   - **Environment:** **Production** (add it again for **Preview** if you want the
-     preview deploys to use it; on the `questvisionstream-test` project the stable
-     apex is the **Production** env).
-4. **Save**. Reload the app — done.
+| Store | Change the value → live? | Setup |
+|-------|--------------------------|-------|
+| **Env var** `QVS_SIGNALING_URL` | ❌ **Needs a redeploy** — Pages bakes env vars into the deployment | Simplest |
+| **KV binding** `QVS_CONFIG` (key `signaling_url`) | ✅ **Live, no redeploy** — KV values are read at request time (propagates within seconds) | One-time binding, then edit freely |
+| **`?server=` URL** | ✅ Instant, per-open | Nothing to configure |
 
-The Pages Function `functions/api/config.js` reads this variable (`context.env
-.QVS_SIGNALING_URL`) and returns it at `/api/config`; the app fetches it on
-startup. Editing it takes effect on the next page load — **no rebuild or
-redeploy**. Use `wss://` (the app is served over HTTPS, so plain `ws://` is
-blocked as mixed content). Left unset, the app falls back to a `?server=…` URL
-override.
+> Heads-up: plain Pages **environment variables are baked into the deployment**, so
+> editing `QVS_SIGNALING_URL` only affects the running site after a **new deploy**
+> (Deployments → **⋯ → Retry deployment**). If you want to change the server *while
+> the app is live*, use the **KV** option below.
 
-> New variables apply to **future requests** immediately (Functions read them at
-> request time). If you had the app open, just reload it.
+#### Option A — KV binding (live, no redeploy) — recommended if you change it often
+1. **Create a KV namespace:** Workers & Pages → **KV** → **Create namespace**
+   (e.g. `qvs-config`). (Or `npx wrangler@4 kv namespace create qvs-config`.)
+2. **Bind it to the project:** the project → **Settings → Bindings → Add → KV
+   namespace** → **Variable name `QVS_CONFIG`** → select `qvs-config` → for
+   **Production** (and Preview if wanted). Adding the binding needs **one** redeploy
+   to wire it up (Deployments → Retry deployment).
+3. **Set the value:** Workers & Pages → KV → `qvs-config` → **+ Entry** →
+   **Key `signaling_url`**, **Value `wss://your-host:3000`**. (Or
+   `npx wrangler@4 kv key put --binding QVS_CONFIG signaling_url "wss://host:3000"`.)
+4. **Change it anytime** by editing that KV entry — no redeploy. Reload the app.
+
+#### Option B — env var (simplest; change = redeploy)
+1. Project → **Settings → Variables and Secrets** (this is the "env vars" section —
+   *not* "Bindings", *not* "Runtime") → **+ Add**.
+2. Type **Plaintext**, **Name `QVS_SIGNALING_URL`**, **Value `wss://your-host:3000`**,
+   **Environment Production** (on `questvisionstream-test`, Production is its stable
+   apex).
+3. **Save**, then **redeploy** (Deployments → ⋯ → Retry deployment) for the change
+   to take effect. Reload the app.
+
+`functions/api/config.js` reads **KV first, then the env var**, and returns
+`{ "server": "…" }` at `/api/config`. Use `wss://` (the app is HTTPS, so plain
+`ws://` is blocked as mixed content). With neither set, the app falls back to a
+`?server=wss://HOST:3000` URL override — instant and needs no Cloudflare config at
+all.
 
 ### 5. (Optional) short links
 The summary always shows the **apex URL + QR** (which always work — scanning the
@@ -123,9 +138,10 @@ At startup it resolves the signaling URL in this order (first match wins), in
 1. **`?server=` URL override** — e.g. `…pages.dev/?server=wss://host:3000`. Highest
    priority; handy for one-off testing.
 2. **`/api/config`** — the Pages Function (`functions/api/config.js`) returns the
-   project's `QVS_SIGNALING_URL` env var. **This is the online-editable path**
-   (step 4): change it in the Cloudflare dashboard, reload the app, done — no
-   rebuild. Production and staging each have their own value.
+   server from a **KV binding** (`QVS_CONFIG` / `signaling_url`) if present, else
+   the **`QVS_SIGNALING_URL` env var**. This is the central, dashboard-managed path
+   (step 4). KV values are live (no redeploy); env-var changes need a redeploy.
+   Production and staging each have their own value.
 3. **`VITE_SIGNALING_URL`** — baked at build time (set it in the workflow's build
    step if you want a compile-time default). Optional.
 4. **`ws://localhost:3000`** — dev fallback.
