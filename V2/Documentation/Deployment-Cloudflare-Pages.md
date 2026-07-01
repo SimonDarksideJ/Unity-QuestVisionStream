@@ -20,8 +20,10 @@ site:
 | **Production** | `questvisionstream` | `questvisionstream.pages.dev` | **push** to the home branch (a merged PR) or manual **workflow_dispatch** |
 | **Staging** | `questvisionstream-test` | `questvisionstream-test.pages.dev` | **pull_request** targeting the home branch |
 
-- **Home branch** (default): `claude/yolo-streaming-unity-modernize-2stzq2` — push
-  = production; PRs against it = staging.
+- **Home branch** (default): `IWSDK` — push = production; PRs targeting it = staging.
+  Flow: work on a feature branch → open a PR **into `IWSDK`** (deploys **staging**,
+  isolated) → merge into `IWSDK` (deploys **production**). This matches PR #1
+  (`claude/…` → `IWSDK`), which deploys to staging.
 - Projects are **created automatically** on the first deploy (the workflow calls
   the Cloudflare API, idempotently), so you don't pre-create them in the dashboard.
 - The workflow only runs when `V2/quest-client/**` (excluding `*.md`/`.vscode`) or
@@ -78,9 +80,11 @@ releases):
 | `da.gd/questvisionstream` | production apex (+ `?server=` if the variable is set) |
 | `da.gd/questvisionstreamtest` | staging apex (+ `?server=` if set) |
 
-Custom codes are global, so if one is already taken the run **warns** and reuses
-whatever exists; if a reused code points somewhere unexpected the summary flags a
-`TARGET MISMATCH` — delete/recreate it or change the code names in the workflow.
+Custom codes are global. The short URL shown in the summary is deterministic
+(`https://da.gd/questvisionstream`), so the summary always renders even if da.gd is
+slow or the code is already taken; the run just prints a **warning** if da.gd
+didn't confirm the code. If a code is taken by someone else, change the alias names
+in the workflow.
 
 ### 6. Trigger a deploy
 - **Production:** push a `V2/quest-client/**` change to the home branch, or run the
@@ -98,7 +102,7 @@ All in `.github/workflows/quest-client-deploy.yml`:
 |-----------|-------|
 | **Home branch** | `on.pull_request.branches`, `on.push.branches`, and `PROD_BRANCH` in *deploy-production* — change all three together |
 | **Project names** | `--project-name=` and the `PROJECT:` env in each *Ensure … project* step, plus the `APEX_URL` in the summary steps |
-| **Short codes** | the `shorten … questvisionstream` (prod) and `questvisionstreamtest` (staging) aliases |
+| **Short codes** | the `ALIAS=` value in each *Publish … short code* step (`questvisionstream` prod / `questvisionstreamtest` staging) |
 
 ## Custom domain (optional)
 

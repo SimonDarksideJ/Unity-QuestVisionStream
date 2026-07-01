@@ -5,7 +5,7 @@
 #
 # ─── THINGS YOU MAY WANT TO CHANGE ──────────────────────────────────────────────
 #   • HOME BRANCH (the feature's home; production on push, staging base on PR):
-#       currently  claude/yolo-streaming-unity-modernize-2stzq2
+#       currently  IWSDK
 #       appears in 3 places → on.pull_request.branches, on.push.branches, and the
 #       PROD_BRANCH env of deploy-production. Change all three together.
 #   • CLOUDFLARE PAGES PROJECTS:
@@ -32,7 +32,7 @@ name: QuestVisionStream WebXR Deploy
 
 on:
   pull_request:
-    branches: [claude/yolo-streaming-unity-modernize-2stzq2]
+    branches: [IWSDK]
     # Build/deploy only when the CLIENT changes — not docs or editor config.
     paths:
       - "V2/quest-client/**"
@@ -41,7 +41,7 @@ on:
       - "!V2/quest-client/.vscode/**"
       - ".github/workflows/quest-client-deploy.yml"
   push:
-    branches: [claude/yolo-streaming-unity-modernize-2stzq2]
+    branches: [IWSDK]
     paths:
       - "V2/quest-client/**"
       - "!V2/quest-client/*.md"
@@ -121,7 +121,7 @@ jobs:
         env:
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: questvisionstream
-          PROD_BRANCH: claude/yolo-streaming-unity-modernize-2stzq2
+          PROD_BRANCH: IWSDK
         run: |
           set -euo pipefail
           api="https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects"
@@ -173,48 +173,34 @@ jobs:
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
           DEFAULT_SERVER: ${{ vars.QVS_DEFAULT_SERVER }}
         run: |
-          set -uo pipefail
-          DIAG=""
-          note() { echo "[shortcode] $*"; DIAG="${DIAG}$*"$'\n'; }
-          # Bake the signaling server into the target when provided.
-          if [ -n "${DEFAULT_SERVER}" ]; then
-            TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"
-          else
-            TARGET="${APEX_URL}"
+          # Never abort: the summary must post even if da.gd/curl/jq hiccup. The
+          # short URL is DETERMINISTIC (da.gd custom codes are idempotent), so the
+          # summary never depends on a network call succeeding.
+          set +e
+          ALIAS="questvisionstream"
+          if [ -n "${DEFAULT_SERVER}" ]; then TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"; else TARGET="${APEX_URL}"; fi
+          SHORT="https://da.gd/${ALIAS}"
+          # Best-effort: create/point the short code at TARGET (non-fatal).
+          enc="$(jq -rn --arg u "$TARGET" '$u|@uri' 2>/dev/null)"
+          resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${ALIAS}" 2>&1)"
+          echo "[shortcode] da.gd '${ALIAS}': ${resp}"
+          if [ -n "$resp" ] && ! printf '%s' "$resp" | grep -q "da.gd/${ALIAS}"; then
+            echo "::warning title=Short code::da.gd did not confirm '${ALIAS}' (taken/rate-limited?): ${resp} — the link still works if the code already points to this app."
           fi
-          SHORT=""; SOURCE="apex"
-          shorten() {
-            local URL="$1" alias="$2" enc final resp
-            enc="$(jq -rn --arg u "$URL" '$u|@uri')"
-            resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${alias}" 2>&1)" || true
-            note "da.gd custom '${alias}': ${resp}"
-            if [ "$resp" = "https://da.gd/${alias}" ]; then
-              SHORT="https://da.gd/${alias}"; SOURCE="custom-created"; return
-            fi
-            SHORT="https://da.gd/${alias}"; SOURCE="reused (expected)"
-            final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://da.gd/${alias}" 2>/dev/null || true)"
-            if [ -n "$final" ] && ! printf '%s' "$final" | grep -qF "$URL"; then
-              SOURCE="reused (TARGET MISMATCH - recreate alias)"
-              note "WARNING: ${alias} resolves to '${final}', expected '${URL}'."
-            fi
-          }
-          shorten "$TARGET" "questvisionstream"
-          OPEN="${SHORT:-$TARGET}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
-          note "OPEN: ${OPEN} (${SOURCE})"
-          echo "::notice title=QuestVisionStream short code::${DIAG//$'\n'/%0A}"
-          qrenc="$(jq -rn --arg u "$OPEN" '$u|@uri')"
+          qrenc="$(jq -rn --arg u "$SHORT" '$u|@uri' 2>/dev/null)"
           {
             echo "## QuestVisionStream WebXR (PRODUCTION) — open on your Quest"
             echo ""
             echo "| | |"
             echo "| --- | --- |"
-            echo "| **Open** | [\`$(disp "$OPEN")\`](${OPEN}) |"
+            echo "| **Open (short)** | [\`$(disp "$SHORT")\`](${SHORT}) |"
+            echo "| **Direct** | [\`$(disp "$TARGET")\`](${TARGET}) |"
             if [ -z "${DEFAULT_SERVER}" ]; then
-              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the apex |"
+              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the URL |"
             fi
             echo "| **Stable URL** | [\`${APEX_URL}\`](${APEX_URL}) |"
-            echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
+            [ -n "${DEPLOY_URL}" ] && echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
             echo ""
             echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -322,18 +308,16 @@ jobs:
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
           DEFAULT_SERVER: ${{ vars.QVS_DEFAULT_SERVER }}
         run: |
-          set -uo pipefail
-          if [ -n "${DEFAULT_SERVER}" ]; then
-            TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"
-          else
-            TARGET="${APEX_URL}"
-          fi
-          enc="$(jq -rn --arg u "$TARGET" '$u|@uri')"
-          resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=questvisionstreamtest" 2>&1)" || true
-          if [ "$resp" = "https://da.gd/questvisionstreamtest" ]; then SHORT="$resp"; else SHORT="https://da.gd/questvisionstreamtest"; fi
-          OPEN="${SHORT:-$TARGET}"
+          # Never abort — see the production step. Deterministic short URL.
+          set +e
+          ALIAS="questvisionstreamtest"
+          if [ -n "${DEFAULT_SERVER}" ]; then TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"; else TARGET="${APEX_URL}"; fi
+          SHORT="https://da.gd/${ALIAS}"
+          enc="$(jq -rn --arg u "$TARGET" '$u|@uri' 2>/dev/null)"
+          resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${ALIAS}" 2>&1)"
+          echo "[shortcode] da.gd '${ALIAS}': ${resp}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
-          qrenc="$(jq -rn --arg u "$OPEN" '$u|@uri')"
+          qrenc="$(jq -rn --arg u "$SHORT" '$u|@uri' 2>/dev/null)"
           {
             echo "## QuestVisionStream WebXR (STAGING — questvisionstream-test) — safe to test"
             echo ""
@@ -342,12 +326,13 @@ jobs:
             echo ""
             echo "| | |"
             echo "| --- | --- |"
-            echo "| **Open** | [\`$(disp "$OPEN")\`](${OPEN}) |"
+            echo "| **Open (short)** | [\`$(disp "$SHORT")\`](${SHORT}) |"
+            echo "| **Direct** | [\`$(disp "$TARGET")\`](${TARGET}) |"
             if [ -z "${DEFAULT_SERVER}" ]; then
-              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the apex |"
+              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the URL |"
             fi
             echo "| **Staging URL** | [\`${APEX_URL}\`](${APEX_URL}) |"
-            echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
+            [ -n "${DEPLOY_URL}" ] && echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
             echo ""
             echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
           } >> "$GITHUB_STEP_SUMMARY"
