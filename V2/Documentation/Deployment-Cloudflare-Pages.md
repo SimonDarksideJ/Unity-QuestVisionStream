@@ -57,34 +57,31 @@ secret**:
 Names must match **exactly** (the workflow reads `secrets.CLOUDFLARE_API_TOKEN`
 and `secrets.CLOUDFLARE_ACCOUNT_ID`).
 
-### 4. (Optional) Bake your signaling server into the share links
-Repo → **Settings → Secrets and variables → Actions → Variables → New repository
-variable**:
+### 4. Point the deployed app at your streaming server (online-editable)
+This is **how the client knows which server to connect to** — see
+[How the app finds its server](#how-the-app-finds-its-server) for the full order.
+The recommended, online-editable way needs no rebuild:
 
-| Variable name | Example value | Effect |
-|---------------|---------------|--------|
-| `QVS_DEFAULT_SERVER` | `wss://your-host:3000` | The short code/QR target becomes `apex/?server=<value>`, so scanning it connects straight to your server. |
+Cloudflare dashboard → **Workers & Pages → `questvisionstream` → Settings →
+Variables and Secrets → Add variable**:
 
-Leave it unset to have links open the app at the apex; then add
-`?server=wss://HOST:3000` yourself. (A plain query appended to a short code is
-dropped by the redirect, which is why the server is baked into the short-code
-**target** — set this variable rather than editing links by hand.)
+| Variable name | Example value | Scope |
+|---------------|---------------|-------|
+| `QVS_SIGNALING_URL` | `wss://your-host:3000` | Set for **Production**; set it on the `questvisionstream-test` project for staging |
 
-### 5. (Optional) Reserve the da.gd short codes
-The workflow creates these custom [da.gd](https://da.gd) codes on first
-production/staging deploy and reuses them afterwards (they stay constant across
-releases):
+The Pages Function `functions/api/config.js` returns this value at `/api/config`,
+and the app fetches it on startup. Edit it in the dashboard and reload the app —
+**no rebuild or redeploy**. Use `wss://` (the app is served over HTTPS, so a plain
+`ws://` is blocked as mixed content). Leave it unset to fall back to a
+`?server=…` URL override.
 
-| Code | → target |
-|------|----------|
-| `da.gd/questvisionstream` | production apex (+ `?server=` if the variable is set) |
-| `da.gd/questvisionstreamtest` | staging apex (+ `?server=` if set) |
-
-Custom codes are global. The short URL shown in the summary is deterministic
-(`https://da.gd/questvisionstream`), so the summary always renders even if da.gd is
-slow or the code is already taken; the run just prints a **warning** if da.gd
-didn't confirm the code. If a code is taken by someone else, change the alias names
-in the workflow.
+### 5. (Optional) short links
+The summary always shows the **apex URL + QR** (which always work). It *also*
+tries to create a memorable [is.gd](https://is.gd) short link
+(`is.gd/questvisionstream` / `is.gd/questvisionstreamtest`) and shows it **only if
+that succeeds** — so you never get a dead link. If the alias is taken or is.gd is
+unavailable, the run prints a notice and just uses the apex. Change the `ALIAS=`
+values in the *Publish …* steps to pick different names.
 
 ### 6. Trigger a deploy
 - **Production:** push a `V2/quest-client/**` change to the home branch, or run the
@@ -93,6 +90,28 @@ in the workflow.
   change.
 
 Open the run's **Summary** for the links + QR.
+
+## How the app finds its server
+
+The WebXR client is a **static** bundle — it has no server baked in by default.
+At startup it resolves the signaling URL in this order (first match wins), in
+`V2/quest-client/src/config.ts`:
+
+1. **`?server=` URL override** — e.g. `…pages.dev/?server=wss://host:3000`. Highest
+   priority; handy for one-off testing.
+2. **`/api/config`** — the Pages Function (`functions/api/config.js`) returns the
+   project's `QVS_SIGNALING_URL` env var. **This is the online-editable path**
+   (step 4): change it in the Cloudflare dashboard, reload the app, done — no
+   rebuild. Production and staging each have their own value.
+3. **`VITE_SIGNALING_URL`** — baked at build time (set it in the workflow's build
+   step if you want a compile-time default). Optional.
+4. **`ws://localhost:3000`** — dev fallback.
+
+So the normal setup is: deploy once, then set `QVS_SIGNALING_URL` on each Pages
+project. The plain apex URL / QR then "just works" because the app self-configures.
+
+> WebRTC media still needs a reachable server + (for cross-NAT) TURN — see
+> `Install-Mac-M2.md`. This only controls **which signaling URL** the client dials.
 
 ## Changing the defaults
 
@@ -126,3 +145,7 @@ point at it.
   the sibling packages is needed in CI.
 - `V2/quest-client/package-lock.json` is committed (required by `npm ci`).
 - Node 22 (pinned in the workflow).
+- `V2/quest-client/functions/api/config.js` is a **Cloudflare Pages Function**
+  (deployed automatically by `wrangler pages deploy` from the project dir). It is
+  not part of the Vite/TypeScript build; it powers the online-editable
+  `QVS_SIGNALING_URL`.

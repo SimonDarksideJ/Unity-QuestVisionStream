@@ -1,7 +1,7 @@
 import { World, SessionMode } from '@iwsdk/core';
 import { QuestVisionStreamClient } from '@questvisionstream/client';
 import { ServiceManager } from '@realitycollective/service-framework-ts';
-import { AppConfig } from './config';
+import { resolveSignalingUrl } from './config';
 import { ServicePumpSystem } from './systems/ServicePumpSystem';
 import { CameraStreamSystem } from './systems/CameraStreamSystem';
 import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
@@ -18,8 +18,12 @@ import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
  *     they never import concrete service classes.
  */
 async function bootstrap(): Promise<void> {
+  // Resolve which streaming server to use (query param → Cloudflare Pages env var
+  // via /api/config → build-time env → localhost). See src/config.ts.
+  const signalingUrl = await resolveSignalingUrl();
+
   const qvs = new QuestVisionStreamClient({
-    signalingUrl: AppConfig.signalingUrl,
+    signalingUrl,
     logLevel: 'info',
   });
   await qvs.start();
@@ -55,7 +59,7 @@ async function bootstrap(): Promise<void> {
     .registerSystem(CameraStreamSystem)
     .registerSystem(DetectionRenderSystem);
 
-  console.info('[QuestClient] Ready. Streaming to', AppConfig.signalingUrl);
+  console.info('[QuestClient] Ready. Streaming to', signalingUrl);
 }
 
 bootstrap().catch((err) => console.error('[QuestClient] bootstrap failed', err));

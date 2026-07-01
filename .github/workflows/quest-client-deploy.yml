@@ -11,11 +11,13 @@
 #   • CLOUDFLARE PAGES PROJECTS:
 #       production → `questvisionstream`       (apex questvisionstream.pages.dev)
 #       staging    → `questvisionstream-test`  (apex questvisionstream-test.pages.dev)
-#   • DA.GD SHORT CODES: `questvisionstream` (prod) / `questvisionstreamtest` (staging).
-#   • OPTIONAL repo VARIABLE `QVS_DEFAULT_SERVER` (e.g. wss://your-server:3000): when
-#     set, it is baked into the share link/QR so scanning it connects straight to
-#     your signaling server. When unset, links open the app at the apex and you add
-#     ?server=wss://HOST:3000 yourself.
+#   • SHORT-LINK ALIASES (is.gd, best-effort): `questvisionstream` (prod) /
+#     `questvisionstreamtest` (staging). If unavailable, the summary just shows the
+#     apex URL + QR (which always work).
+#   • SIGNALING SERVER the deployed app connects to: set a Cloudflare Pages env var
+#     `QVS_SIGNALING_URL` per project (Settings → Variables and Secrets), editable
+#     ONLINE with no rebuild — served to the app by functions/api/config.js. The
+#     app also honours a `?server=wss://HOST:3000` URL override.
 #
 # Two ISOLATED Cloudflare Pages projects keep PR validation off the live site:
 #   - production → questvisionstream       — ONLY on push to the home branch
@@ -163,44 +165,40 @@ jobs:
             --commit-dirty=true
 
       - name: Publish short code + QR for the Quest
-        # da.gd custom code `questvisionstream` stays constant across releases and
-        # points at the apex (with ?server=<QVS_DEFAULT_SERVER> baked in when that
-        # repo variable is set — appending a query to a short code is dropped by the
-        # redirect, so it must live in the TARGET).
+        # The apex URL + QR is the guaranteed share (always works). The short link
+        # is a best-effort bonus, shown ONLY when the shortener returns a real URL
+        # — so we never print a broken link (the old da.gd path truncated the alias
+        # and produced dead links).
         if: steps.deploy.outcome == 'success'
         env:
           APEX_URL: https://questvisionstream.pages.dev
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
-          DEFAULT_SERVER: ${{ vars.QVS_DEFAULT_SERVER }}
         run: |
-          # Never abort: the summary must post even if da.gd/curl/jq hiccup. The
-          # short URL is DETERMINISTIC (da.gd custom codes are idempotent), so the
-          # summary never depends on a network call succeeding.
           set +e
           ALIAS="questvisionstream"
-          if [ -n "${DEFAULT_SERVER}" ]; then TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"; else TARGET="${APEX_URL}"; fi
-          SHORT="https://da.gd/${ALIAS}"
-          # Best-effort: create/point the short code at TARGET (non-fatal).
-          enc="$(jq -rn --arg u "$TARGET" '$u|@uri' 2>/dev/null)"
-          resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${ALIAS}" 2>&1)"
-          echo "[shortcode] da.gd '${ALIAS}': ${resp}"
-          if [ -n "$resp" ] && ! printf '%s' "$resp" | grep -q "da.gd/${ALIAS}"; then
-            echo "::warning title=Short code::da.gd did not confirm '${ALIAS}' (taken/rate-limited?): ${resp} — the link still works if the code already points to this app."
-          fi
+          APEX="${APEX_URL}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
-          qrenc="$(jq -rn --arg u "$SHORT" '$u|@uri' 2>/dev/null)"
+          SHORT=""
+          enc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
+          resp="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}&shorturl=${ALIAS}" 2>&1)"
+          echo "[shortcode] is.gd '${ALIAS}': ${resp}"
+          case "$resp" in
+            https://is.gd/*) SHORT="$resp" ;;
+            *) echo "::notice title=Short link::is.gd unavailable for '${ALIAS}' (taken/rate-limited) — using the apex URL. Response: ${resp}" ;;
+          esac
+          qrenc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
           {
             echo "## QuestVisionStream WebXR (PRODUCTION) — open on your Quest"
             echo ""
+            echo "Scan the QR or open the URL on the headset. The app reads its"
+            echo "streaming server from Cloudflare — see **Signaling server** below."
+            echo ""
             echo "| | |"
             echo "| --- | --- |"
-            echo "| **Open (short)** | [\`$(disp "$SHORT")\`](${SHORT}) |"
-            echo "| **Direct** | [\`$(disp "$TARGET")\`](${TARGET}) |"
-            if [ -z "${DEFAULT_SERVER}" ]; then
-              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the URL |"
-            fi
-            echo "| **Stable URL** | [\`${APEX_URL}\`](${APEX_URL}) |"
+            echo "| **Open** | [\`$(disp "$APEX")\`](${APEX}) |"
+            [ -n "$SHORT" ] && echo "| **Short link** | [\`$(disp "$SHORT")\`](${SHORT}) |"
             [ -n "${DEPLOY_URL}" ] && echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
+            echo "| **Signaling server** | set \`QVS_SIGNALING_URL\` in Cloudflare Pages → Settings → Variables (or append \`?server=wss://HOST:3000\`) |"
             echo ""
             echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -306,18 +304,21 @@ jobs:
         env:
           APEX_URL: https://questvisionstream-test.pages.dev
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
-          DEFAULT_SERVER: ${{ vars.QVS_DEFAULT_SERVER }}
         run: |
-          # Never abort — see the production step. Deterministic short URL.
+          # Apex + QR always; short link only if the shortener returns a real URL.
           set +e
           ALIAS="questvisionstreamtest"
-          if [ -n "${DEFAULT_SERVER}" ]; then TARGET="${APEX_URL}/?server=${DEFAULT_SERVER}"; else TARGET="${APEX_URL}"; fi
-          SHORT="https://da.gd/${ALIAS}"
-          enc="$(jq -rn --arg u "$TARGET" '$u|@uri' 2>/dev/null)"
-          resp="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${ALIAS}" 2>&1)"
-          echo "[shortcode] da.gd '${ALIAS}': ${resp}"
+          APEX="${APEX_URL}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
-          qrenc="$(jq -rn --arg u "$SHORT" '$u|@uri' 2>/dev/null)"
+          SHORT=""
+          enc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
+          resp="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}&shorturl=${ALIAS}" 2>&1)"
+          echo "[shortcode] is.gd '${ALIAS}': ${resp}"
+          case "$resp" in
+            https://is.gd/*) SHORT="$resp" ;;
+            *) echo "::notice title=Short link::is.gd unavailable for '${ALIAS}' — using the apex URL. Response: ${resp}" ;;
+          esac
+          qrenc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
           {
             echo "## QuestVisionStream WebXR (STAGING — questvisionstream-test) — safe to test"
             echo ""
@@ -326,13 +327,10 @@ jobs:
             echo ""
             echo "| | |"
             echo "| --- | --- |"
-            echo "| **Open (short)** | [\`$(disp "$SHORT")\`](${SHORT}) |"
-            echo "| **Direct** | [\`$(disp "$TARGET")\`](${TARGET}) |"
-            if [ -z "${DEFAULT_SERVER}" ]; then
-              echo "| **Add your server** | append \`?server=wss://HOST:3000\` to the URL |"
-            fi
-            echo "| **Staging URL** | [\`${APEX_URL}\`](${APEX_URL}) |"
+            echo "| **Open** | [\`$(disp "$APEX")\`](${APEX}) |"
+            [ -n "$SHORT" ] && echo "| **Short link** | [\`$(disp "$SHORT")\`](${SHORT}) |"
             [ -n "${DEPLOY_URL}" ] && echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
+            echo "| **Signaling server** | set \`QVS_SIGNALING_URL\` on the \`questvisionstream-test\` project (Settings → Variables) or append \`?server=wss://HOST:3000\` |"
             echo ""
             echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
           } >> "$GITHUB_STEP_SUMMARY"
