@@ -60,28 +60,51 @@ and `secrets.CLOUDFLARE_ACCOUNT_ID`).
 ### 4. Point the deployed app at your streaming server (online-editable)
 This is **how the client knows which server to connect to** — see
 [How the app finds its server](#how-the-app-finds-its-server) for the full order.
-The recommended, online-editable way needs no rebuild:
+The recommended, online-editable way needs no rebuild.
 
-Cloudflare dashboard → **Workers & Pages → `questvisionstream` → Settings →
-Variables and Secrets → Add variable**:
+**Exactly where in the dashboard** (the "env vars" you're looking for are called
+**Variables and Secrets** in the current UI):
 
-| Variable name | Example value | Scope |
-|---------------|---------------|-------|
-| `QVS_SIGNALING_URL` | `wss://your-host:3000` | Set for **Production**; set it on the `questvisionstream-test` project for staging |
+1. Cloudflare dashboard → **Workers & Pages** → click the **`questvisionstream`**
+   project (or `questvisionstream-test` for staging).
+2. **Settings** tab → **Variables and Secrets** (this is the env-var section —
+   *not* "Bindings", which is for KV/R2/D1; *not* "Runtime", which is compat flags).
+3. **+ Add** → Type **Plaintext** (not Secret) →
+   - **Variable name:** `QVS_SIGNALING_URL`
+   - **Value:** `wss://your-host:3000`
+   - **Environment:** **Production** (add it again for **Preview** if you want the
+     preview deploys to use it; on the `questvisionstream-test` project the stable
+     apex is the **Production** env).
+4. **Save**. Reload the app — done.
 
-The Pages Function `functions/api/config.js` returns this value at `/api/config`,
-and the app fetches it on startup. Edit it in the dashboard and reload the app —
-**no rebuild or redeploy**. Use `wss://` (the app is served over HTTPS, so a plain
-`ws://` is blocked as mixed content). Leave it unset to fall back to a
-`?server=…` URL override.
+The Pages Function `functions/api/config.js` reads this variable (`context.env
+.QVS_SIGNALING_URL`) and returns it at `/api/config`; the app fetches it on
+startup. Editing it takes effect on the next page load — **no rebuild or
+redeploy**. Use `wss://` (the app is served over HTTPS, so plain `ws://` is
+blocked as mixed content). Left unset, the app falls back to a `?server=…` URL
+override.
+
+> New variables apply to **future requests** immediately (Functions read them at
+> request time). If you had the app open, just reload it.
 
 ### 5. (Optional) short links
-The summary always shows the **apex URL + QR** (which always work). It *also*
-tries to create a memorable [is.gd](https://is.gd) short link
-(`is.gd/questvisionstream` / `is.gd/questvisionstreamtest`) and shows it **only if
-that succeeds** — so you never get a dead link. If the alias is taken or is.gd is
-unavailable, the run prints a notice and just uses the apex. Change the `ALIAS=`
-values in the *Publish …* steps to pick different names.
+The summary always shows the **apex URL + QR** (which always work — scanning the
+QR is the easiest way onto the Quest). It *also* adds a stable
+[is.gd](https://is.gd) short link, **idempotently**:
+
+1. tries to create the custom alias (`is.gd/questvisionstream` /
+   `is.gd/questvisionstreamtest`);
+2. if is.gd says it already exists, it checks where that code **currently
+   resolves** — because the target (the apex) is *stable*, a code that already
+   points at our apex is ours from a previous run, so it is **reused** as-is (no
+   update needed);
+3. only if the alias is taken by *someone else's* target does it fall back to an
+   **auto-generated** `is.gd/xxxxx` code (which can't collide);
+4. if is.gd itself is unreachable, the short-link row is simply omitted.
+
+So the custom code is created once and reused forever, and you never get a dead or
+wrong link. Change the `ALIAS=` values in the *Publish …* steps to pick a
+different (available) custom name — once claimed, an is.gd custom code is yours.
 
 ### 6. Trigger a deploy
 - **Production:** push a `V2/quest-client/**` change to the home branch, or run the

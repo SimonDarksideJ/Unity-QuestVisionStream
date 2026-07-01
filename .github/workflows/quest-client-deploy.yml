@@ -179,13 +179,31 @@ jobs:
           APEX="${APEX_URL}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
           SHORT=""
+          APEX_HOST="${APEX#https://}"; APEX_HOST="${APEX_HOST#http://}"
           enc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
+          # 1) Create the stable custom alias. is.gd has no "update", but our target
+          #    (the apex) is STABLE — so if the alias already exists AND still points
+          #    at our apex, it's ours from a previous run: reuse it (idempotent).
           resp="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}&shorturl=${ALIAS}" 2>&1)"
-          echo "[shortcode] is.gd '${ALIAS}': ${resp}"
+          echo "[shortcode] is.gd create '${ALIAS}': ${resp}"
           case "$resp" in
             https://is.gd/*) SHORT="$resp" ;;
-            *) echo "::notice title=Short link::is.gd unavailable for '${ALIAS}' (taken/rate-limited) — using the apex URL. Response: ${resp}" ;;
+            *)
+              final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://is.gd/${ALIAS}" 2>/dev/null)"
+              echo "[shortcode] existing '${ALIAS}' -> ${final}"
+              case "$final" in
+                *"${APEX_HOST}"*) SHORT="https://is.gd/${ALIAS}"; echo "[shortcode] reusing existing (points at our apex)" ;;
+                *) echo "::notice title=Short link::is.gd/${ALIAS} is taken by another target; using an auto code instead." ;;
+              esac
+              ;;
           esac
+          # 2) Fallback: auto-generated code (reliable; cannot collide).
+          if [ -z "$SHORT" ]; then
+            resp2="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}" 2>&1)"
+            echo "[shortcode] is.gd auto: ${resp2}"
+            case "$resp2" in https://is.gd/*) SHORT="$resp2" ;; esac
+          fi
+          [ -z "$SHORT" ] && echo "::notice title=Short link::is.gd unavailable — the apex URL + QR still work."
           qrenc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
           {
             echo "## QuestVisionStream WebXR (PRODUCTION) — open on your Quest"
@@ -311,13 +329,29 @@ jobs:
           APEX="${APEX_URL}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
           SHORT=""
+          APEX_HOST="${APEX#https://}"; APEX_HOST="${APEX_HOST#http://}"
           enc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
+          # Create the custom alias; reuse it if it already points at our stable apex
+          # (is.gd has no update, but our target never changes); else auto-generate.
           resp="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}&shorturl=${ALIAS}" 2>&1)"
-          echo "[shortcode] is.gd '${ALIAS}': ${resp}"
+          echo "[shortcode] is.gd create '${ALIAS}': ${resp}"
           case "$resp" in
             https://is.gd/*) SHORT="$resp" ;;
-            *) echo "::notice title=Short link::is.gd unavailable for '${ALIAS}' — using the apex URL. Response: ${resp}" ;;
+            *)
+              final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://is.gd/${ALIAS}" 2>/dev/null)"
+              echo "[shortcode] existing '${ALIAS}' -> ${final}"
+              case "$final" in
+                *"${APEX_HOST}"*) SHORT="https://is.gd/${ALIAS}"; echo "[shortcode] reusing existing (points at our apex)" ;;
+                *) echo "::notice title=Short link::is.gd/${ALIAS} is taken by another target; using an auto code instead." ;;
+              esac
+              ;;
           esac
+          if [ -z "$SHORT" ]; then
+            resp2="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}" 2>&1)"
+            echo "[shortcode] is.gd auto: ${resp2}"
+            case "$resp2" in https://is.gd/*) SHORT="$resp2" ;; esac
+          fi
+          [ -z "$SHORT" ] && echo "::notice title=Short link::is.gd unavailable — the apex URL + QR still work."
           qrenc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
           {
             echo "## QuestVisionStream WebXR (STAGING — questvisionstream-test) — safe to test"

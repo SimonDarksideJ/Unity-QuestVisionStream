@@ -12,7 +12,15 @@ Guides and deployment references for the V2 stack.
 - **[Deployment-Cloudflare-Pages.md](Deployment-Cloudflare-Pages.md)** — deploy the
   WebXR client to Cloudflare Pages (isolated production + staging projects) via
   GitHub Actions, with per-deploy summary + short code + QR. Preparation checklist
-  for the `CLOUDFLARE_*` secrets.
+  for the `CLOUDFLARE_*` secrets, and where to set `QVS_SIGNALING_URL`.
+
+- **[Architecture-and-Hosting.md](Architecture-and-Hosting.md)** — the big picture:
+  components (client / library / service-framework / server), end-to-end data flow,
+  and the client + server hosting topology (LAN / Tailscale / tunnel / TURN).
+
+- **[Configuration-and-Connectivity.md](Configuration-and-Connectivity.md)** — how
+  the client is configured (which server it dials), the WebRTC connection sequence,
+  ports, STUN/TURN, and a connectivity troubleshooting matrix.
 
 - **examples/**
   - [`com.questvisionstream.plist`](examples/com.questvisionstream.plist) —
