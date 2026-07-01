@@ -1,0 +1,4 @@
+# YOLO detector (default). Install torch for your platform first for GPU/MPS
+# acceleration (see https://pytorch.org/get-started/locally/); the CPU wheel is
+# pulled transitively by ultralytics if you don't.
+ultralytics==8.3.0

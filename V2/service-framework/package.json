@@ -1,0 +1,26 @@
+{
+  "name": "@realitycollective/service-framework-ts",
+  "version": "0.1.0",
+  "description": "TypeScript port of the RealityCollective Service Framework architecture: a ServiceManager orchestrating interface-addressed services with a shared lifecycle, service modules, and profiles. Dependency-injection foundation for WebXR/browser apps.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["service-framework", "dependency-injection", "webxr", "iwsdk", "realitycollective", "ecs", "di"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

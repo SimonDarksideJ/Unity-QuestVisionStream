@@ -1,0 +1,20 @@
+# CPU deployment (Linux servers). On macOS prefer native (run-local.sh): Docker
+# Desktop gives no MPS GPU and no host networking, so WebRTC media usually needs
+# a TURN relay from inside a container.
+services:
+  questvisionstream:
+    build: .
+    ports:
+      - "3000:3000" # signaling (WebSocket)
+      - "8080:8080" # health
+    environment:
+      QVS_DETECTOR: yolo
+      QVS_ENABLE_DISPLAY: "false"
+      QVS_YOLO_IMGSZ: "640"
+      QVS_YOLO_HALF: "false"
+      # On-LAN, media flows direct (no TURN). For remote/NAT crossing set:
+      # QVS_ENABLE_TURN: "true"
+      # QVS_TURN_URLS: "turn:your.turn.server:3478"
+      # QVS_TURN_USERNAME: "user"
+      # QVS_TURN_CREDENTIAL: "pass"
+    restart: unless-stopped
