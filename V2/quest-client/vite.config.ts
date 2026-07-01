@@ -6,18 +6,16 @@ import { fileURLToPath, URL } from 'node:url';
  * server binds to all interfaces; use an HTTPS tunnel (or IWSDK's managed dev
  * runtime) to reach it from a headset over LAN.
  *
- * The two file-linked workspace libraries are aliased to their TypeScript source
- * so Vite bundles them directly (instant HMR when editing the library, and no
- * per-package `node_modules` needed for transitive resolution).
+ * The file-linked library (`@questvisionstream/client`) is aliased to its
+ * TypeScript source so Vite bundles it directly (instant HMR when editing the
+ * library). Its `@realitycollective/service-framework` import resolves from
+ * node_modules like any other npm dependency.
  */
 export default defineConfig({
   resolve: {
     alias: {
       '@questvisionstream/client': fileURLToPath(
         new URL('../com.questvisionstream/src/index.ts', import.meta.url),
-      ),
-      '@realitycollective/service-framework-ts': fileURLToPath(
-        new URL('../service-framework/src/index.ts', import.meta.url),
       ),
     },
   },

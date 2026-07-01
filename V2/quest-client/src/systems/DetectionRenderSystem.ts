@@ -1,6 +1,5 @@
 import { createSystem } from '@iwsdk/core';
 import * as THREE from 'three';
-import { ServiceManager } from '@realitycollective/service-framework-ts';
 import {
   IDetectionService,
   DetectionDeduper,
@@ -10,18 +9,14 @@ import {
   type RenderBatch,
 } from '@questvisionstream/client';
 import { AppConfig } from '../config';
+import { getServiceManager } from '../runtime';
 import { createTagObject } from '../rendering/TagFactory';
 
 /**
- * The host-side implementation of the library's {@link IDetectionRenderer} seam.
- * Subscribes (via DI) to the {@link IDetectionService}, transforms each payload
- * into a resolution-independent {@link RenderBatch}, and places world-anchored
- * tags — the WebXR analogue of the Unity `DetectionSpawnerManager`.
- *
- * World placement: the normalized viewport center is unprojected through the XR
- * camera to a ray, and the tag is placed at a fixed distance along it. (A future
- * enhancement raycasts the ray against IWSDK scene-understanding meshes /
- * environment depth for true surface anchoring — see README.)
+ * Host-side implementation of the library's {@link IDetectionRenderer} seam.
+ * Resolves the {@link IDetectionService} by token and subscribes to its
+ * `detections` event, placing world-anchored tags (the WebXR analogue of the
+ * Unity `DetectionSpawnerManager`).
  */
 export class DetectionRenderSystem
   extends createSystem({})
@@ -32,8 +27,8 @@ export class DetectionRenderSystem
   private unsub: (() => void) | undefined;
 
   override init(): void {
-    const detection = ServiceManager.instance.getService(IDetectionService);
-    this.unsub = detection.detections.on((payload) => {
+    const detection = getServiceManager().resolve(IDetectionService);
+    this.unsub = detection.on('detections', (payload) => {
       this.renderDetections(toRenderBatch(payload, { invertY: AppConfig.invertY }));
     });
   }
@@ -70,7 +65,6 @@ export class DetectionRenderSystem
     const camera = this.world.camera;
     if (!camera) return null;
 
-    // Normalized [0,1] (bottom-up after invertY) → NDC [-1,1].
     const ndc = new THREE.Vector3(center.x * 2 - 1, center.y * 2 - 1, 0.5);
     ndc.unproject(camera);
 

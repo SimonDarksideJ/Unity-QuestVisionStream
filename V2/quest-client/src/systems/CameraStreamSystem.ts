@@ -1,30 +1,28 @@
 import { createSystem, CameraSource, CameraState, CameraUtils, type Entity } from '@iwsdk/core';
-import { ServiceManager } from '@realitycollective/service-framework-ts';
 import {
   IWebRTCService,
   IImageQualifierService,
   type QualifierFrame,
 } from '@questvisionstream/client';
 import { AppConfig } from '../config';
+import { getServiceManager } from '../runtime';
 
 /**
  * Owns the passthrough camera. Creates the `CameraSource` entity, and once the
  * camera is `Active`, hands its `MediaStream` to the {@link IWebRTCService} and
  * wires a downsampled frame provider into the {@link IImageQualifierService}.
  *
- * It also enforces the **edge quality gate**: each frame it toggles the outbound
- * video track's `enabled` flag from the qualifier's verdict, so frames that are
- * too dark/over-exposed are not streamed — saving bandwidth and server inference.
+ * Also enforces the **edge quality gate**: each frame it toggles the outbound
+ * video track's `enabled` flag from the qualifier's verdict.
  *
- * Services are resolved by interface token from the `ServiceManager` (DI); the
- * system never imports concrete service classes.
+ * Services are resolved by interface token from the RealityCollective
+ * `ServiceManager`; the system never imports a concrete service class.
  */
 export class CameraStreamSystem extends createSystem({}) {
   private cameraEntity: Entity | undefined;
   private videoTrack: MediaStreamTrack | undefined;
   private connected = false;
 
-  // Small reusable canvas for cheap luminance sampling.
   private readonly sampleCanvas = document.createElement('canvas');
   private readonly sampleW = 64;
   private readonly sampleH = 48;
@@ -33,8 +31,7 @@ export class CameraStreamSystem extends createSystem({}) {
     this.sampleCanvas.width = this.sampleW;
     this.sampleCanvas.height = this.sampleH;
 
-    // Request camera permission early (before XR session), per IWSDK guidance.
-    void CameraUtils.getDevices();
+    void CameraUtils.getDevices(); // request permission early
 
     this.cameraEntity = this.world.createEntity();
     this.cameraEntity.addComponent(CameraSource, {
@@ -59,7 +56,7 @@ export class CameraStreamSystem extends createSystem({}) {
 
     // Edge gate: pause/resume the outbound track based on image quality.
     if (this.videoTrack) {
-      const qualifier = ServiceManager.instance.getService(IImageQualifierService);
+      const qualifier = getServiceManager().resolve(IImageQualifierService);
       const desired = qualifier.shouldStream;
       if (this.videoTrack.enabled !== desired) this.videoTrack.enabled = desired;
     }
@@ -69,11 +66,11 @@ export class CameraStreamSystem extends createSystem({}) {
     this.connected = true;
     this.videoTrack = stream.getVideoTracks()[0];
 
-    const webrtc = ServiceManager.instance.getService(IWebRTCService);
+    const webrtc = getServiceManager().resolve(IWebRTCService);
     webrtc.setVideoStream(stream);
     void webrtc.connect();
 
-    const qualifier = ServiceManager.instance.getService(IImageQualifierService);
+    const qualifier = getServiceManager().resolve(IImageQualifierService);
     qualifier.setFrameProvider(() => this.grabQualifierFrame());
   }
 

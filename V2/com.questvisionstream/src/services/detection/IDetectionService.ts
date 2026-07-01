@@ -1,22 +1,19 @@
-import type { IService } from '@realitycollective/service-framework-ts';
-import { createServiceToken } from '@realitycollective/service-framework-ts';
-import type { Emitter } from '../../util/Emitter';
+import type { IEventService } from '@realitycollective/service-framework';
+import { createServiceToken } from '@realitycollective/service-framework';
 import type { DetectionsPayload } from './types';
 
-/**
- * Parses raw `detections` data-channel messages into validated, typed payloads
- * and republishes them. Also tracks the most recent frame dimensions the server
- * reports (which the server ramps up over time — adaptive resolution), so
- * renderers can normalize boxes against the correct frame size.
- */
-export interface IDetectionService extends IService {
+export type DetectionEventMap = {
   /** Validated detection payloads, in arrival order. */
-  readonly detections: Emitter<DetectionsPayload>;
+  detections: DetectionsPayload;
+};
 
-  /** Most recent frame size reported by the server, or undefined before first frame. */
+/**
+ * Parses raw `detections` data-channel messages into validated payloads and
+ * republishes them, tracking the most recent (adaptive) frame size and rolling
+ * throughput. Depends (constructor-injected) on {@link IWebRTCService}.
+ */
+export interface IDetectionService extends IEventService<DetectionEventMap> {
   readonly lastFrameSize: { readonly width: number; readonly height: number } | undefined;
-
-  /** Detections received per second (rolling), for diagnostics. */
   readonly detectionsPerSecond: number;
 }
 

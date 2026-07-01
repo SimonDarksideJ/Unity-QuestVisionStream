@@ -3,10 +3,11 @@
 > 📖 Full docs hub: [`../Documentation/`](../Documentation/README.md).
 
 Reusable, **host-agnostic** WebRTC streaming client for QuestVisionStream, built
-as a graph of [RealityCollective Service Framework](../service-framework)
-services. It speaks the exact protocol of `QuestVisionStreamServer` and exposes a
-framework-agnostic **detection rendering seam**, so the same library drives the
-IWSDK Quest client, a plain browser overlay, or a test double — unchanged.
+as a graph of [RealityCollective Service Framework](https://www.npmjs.com/package/@realitycollective/service-framework)
+services (the published npm package — nothing vendored). It speaks the exact
+protocol of `QuestVisionStreamServer` and exposes a framework-agnostic
+**detection rendering seam**, so the same library drives the IWSDK Quest client, a
+plain browser overlay, or a test double — unchanged.
 
 This is the `com.questvisionstream` library folder. It is **file-linked** into
 the Quest client (`file:../com.questvisionstream`) rather than copied, so the
@@ -39,28 +40,39 @@ The `IImageQualifierService` composes **service modules** (data providers) —
 
 ## Usage
 
+The library exposes a **service profile**; the host stands it up with the
+framework's runtime and resolves services by token. On an IWSDK host:
+
 ```ts
-import { QuestVisionStreamClient, toRenderBatch } from '@questvisionstream/client';
+import { startServiceRuntime } from '@realitycollective/service-framework-iwsdk';
+import {
+  createQuestVisionStreamProfile,
+  IWebRTCService,
+  IDetectionService,
+  toRenderBatch,
+} from '@questvisionstream/client';
 
-const qvs = new QuestVisionStreamClient({
-  signalingUrl: 'ws://192.168.1.20:3000',
-  // iceServers: [{ urls: 'turn:...', username, credential }], // remote only
+// `world` is the IWSDK World; `adapter` is the per-frame source it provides.
+const { manager } = startServiceRuntime(world, (adapter) =>
+  createQuestVisionStreamProfile(
+    'quest-vision-stream',
+    { signalingUrl: 'ws://192.168.1.20:3000' /* , iceServers: [...] for remote */ },
+    adapter,
+  ),
+);
+
+// Resolve services by interface token — no concrete classes imported:
+const webrtc = manager.resolve(IWebRTCService);
+webrtc.setVideoStream(cameraStream); // MediaStream from IWSDK CameraSource
+await webrtc.connect();
+
+manager.resolve(IDetectionService).on('detections', (payload) => {
+  myRenderer.renderDetections(toRenderBatch(payload, { invertY: true }));
 });
-
-await qvs.start();                 // opens signaling, brings services up
-await qvs.connect(cameraStream);   // MediaStream from getUserMedia / IWSDK CameraSource
-
-qvs.onDetections((payload) => {
-  const batch = toRenderBatch(payload, { invertY: true });
-  myRenderer.renderDetections(batch); // myRenderer implements IDetectionRenderer
-});
-
-// Optional edge gate: only stream when the image is good enough
-qvs.setQualifierFrameProvider(() => downsampledCameraFrame());
-
-// Each frame from the host loop:
-qvs.update(deltaSeconds);
 ```
+
+Register the `-iwsdk` `ServiceBridgeSystem` with the world to drive per-frame
+ticks + XR focus/pause. See `../quest-client/src/index.ts` for the full wiring.
 
 ## Rendering seam
 
@@ -73,8 +85,10 @@ world-anchored tags (IWSDK hit-test/unprojection) or draw 2D overlay boxes.
 ## Build
 
 ```bash
-npm run typecheck   # tsc --noEmit
+npm install         # pulls @realitycollective/service-framework from npm
+npm run typecheck
 npm run build       # emits dist/
 ```
 
-Depends on `@realitycollective/service-framework-ts` (sibling, file-linked).
+Depends on the published `@realitycollective/service-framework` (npm). The IWSDK
+host additionally uses `@realitycollective/service-framework-iwsdk`.

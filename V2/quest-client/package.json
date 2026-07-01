@@ -13,7 +13,8 @@
   "dependencies": {
     "@iwsdk/core": "^0.4.2",
     "@questvisionstream/client": "file:../com.questvisionstream",
-    "@realitycollective/service-framework-ts": "file:../service-framework",
+    "@realitycollective/service-framework": "^1.0.0",
+    "@realitycollective/service-framework-iwsdk": "^1.0.0",
     "three": "^0.185.1"
   },
   "devDependencies": {

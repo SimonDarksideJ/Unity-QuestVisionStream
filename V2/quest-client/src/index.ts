@@ -1,38 +1,27 @@
-import { World, SessionMode } from '@iwsdk/core';
-import { QuestVisionStreamClient } from '@questvisionstream/client';
-import { ServiceManager } from '@realitycollective/service-framework-ts';
+import { World, SessionMode, VisibilityState, createSystem } from '@iwsdk/core';
+import {
+  startServiceRuntime,
+  makeServiceBridgeSystem,
+  type CreateSystemLike,
+} from '@realitycollective/service-framework-iwsdk';
+import { createQuestVisionStreamProfile } from '@questvisionstream/client';
 import { resolveSignalingUrl } from './config';
-import { ServicePumpSystem } from './systems/ServicePumpSystem';
+import { setServiceManager } from './runtime';
 import { CameraStreamSystem } from './systems/CameraStreamSystem';
 import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
 
 /**
  * Quest WebXR client entry point.
  *
- * Two-phase bootstrap:
- *  1. Construct and start the {@link QuestVisionStreamClient}, which builds the
- *     streaming service graph (signaling → qualifier → webrtc → detection) and
- *     registers it on the shared `ServiceManager` under interface tokens.
- *  2. Create the IWSDK world (camera + environment raycast features) and register
- *     the host systems. Systems resolve services by token from the manager —
- *     they never import concrete service classes.
+ *  1. Create the IWSDK world (camera + environment raycast).
+ *  2. `startServiceRuntime` builds the RealityCollective `ServiceManager` from the
+ *     QuestVisionStream service profile, using the IWSDK adapter as the per-frame
+ *     source.
+ *  3. Register the framework's `ServiceBridgeSystem` (pumps ticks + focus/pause
+ *     from the XR session) and the host systems, which resolve services by token.
  */
 async function bootstrap(): Promise<void> {
-  // Resolve which streaming server to use (query param → Cloudflare Pages env var
-  // via /api/config → build-time env → localhost). See src/config.ts.
   const signalingUrl = await resolveSignalingUrl();
-
-  const qvs = new QuestVisionStreamClient({
-    signalingUrl,
-    logLevel: 'info',
-  });
-  await qvs.start();
-
-  // Forward app focus/pause into the service lifecycle.
-  document.addEventListener('visibilitychange', () => {
-    ServiceManager.instance.onApplicationPause(document.hidden);
-    ServiceManager.instance.onApplicationFocus(!document.hidden);
-  });
 
   const container = document.getElementById('scene-container') as HTMLDivElement;
   const world = await World.create(container, {
@@ -53,9 +42,28 @@ async function bootstrap(): Promise<void> {
     },
   });
 
+  const { manager, adapter } = startServiceRuntime(world, (frameSource) =>
+    createQuestVisionStreamProfile(
+      'quest-vision-stream',
+      { signalingUrl, qualifier: { enabled: true }, logLevel: 'info' },
+      frameSource,
+    ),
+  );
+  setServiceManager(manager);
+
+  // The -iwsdk shim uses minimal structural contracts (it never imports
+  // @iwsdk/core), so we bridge the concrete IWSDK types here: `createSystem` and
+  // the returned bridge class are cast at this documented interop seam.
+  const bridgeSystem = makeServiceBridgeSystem({
+    adapter,
+    manager,
+    world,
+    createSystem: createSystem as unknown as CreateSystemLike,
+    visibleState: VisibilityState.Visible,
+  });
+
   world
-    // Pump services first each frame (priority < 0), then host systems.
-    .registerSystem(ServicePumpSystem, { priority: -100 })
+    .registerSystem(bridgeSystem as never)
     .registerSystem(CameraStreamSystem)
     .registerSystem(DetectionRenderSystem);
 

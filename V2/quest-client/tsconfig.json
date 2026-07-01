@@ -14,7 +14,6 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@realitycollective/service-framework-ts": ["../service-framework/src/index.ts"],
       "@questvisionstream/client": ["../com.questvisionstream/src/index.ts"]
     }
   },

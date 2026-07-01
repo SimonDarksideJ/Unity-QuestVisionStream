@@ -18,7 +18,7 @@ and `../README.md` (repo layout).
       │  quest-client  (Meta IWSDK · Three.js · ECS)                                                   │
       │  ┌────────────────────────────────────────────────────────────────────────────────────────┐   │
       │  │  IWSDK Systems                        Service Framework (DI, ServiceManager)             │   │
-      │  │  • ServicePumpSystem  ──drives──▶  ISignalingService → IImageQualifierService            │   │
+      │  │  • ServiceBridgeSystem (-iwsdk) ─ticks/focus─▶ ISignalingService → IImageQualifierService │  │
       │  │  • CameraStreamSystem  (CameraSource → MediaStream)   → IWebRTCService → IDetectionService│  │
       │  │  • DetectionRenderSystem (IDetectionRenderer: world-anchored tags)                        │  │
       │  └────────────────────────────────────────────────────────────────────────────────────────┘   │
@@ -44,13 +44,15 @@ server** — joined by **WebRTC** (media) + a **WebSocket** (signaling).
 | Package | Role |
 |---------|------|
 | **`quest-client/`** | The IWSDK WebXR app — the *host*. Thin: creates the ECS world, owns the camera, renders detections as world-anchored tags. Deployed to Cloudflare Pages. |
-| **`com.questvisionstream/`** | Reusable, host-agnostic streaming **library** (`@questvisionstream/client`). All the WebRTC/signaling/detection/qualifier logic, as Service Framework services. **File-linked** into the client (reusable, single source). |
-| **`service-framework/`** | TypeScript port of the RealityCollective Service Framework — the DI/lifecycle backbone (`ServiceManager`, `IService`, service modules). Host-agnostic (no IWSDK/Three/DOM deps). |
+| **`com.questvisionstream/`** | Reusable, host-agnostic streaming **library** (`@questvisionstream/client`). All the WebRTC/signaling/detection/qualifier logic, as Service Framework services. **File-linked** into the client (reusable, single source; not published). |
+| **DI backbone** (from npm) | [`@realitycollective/service-framework`](https://www.npmjs.com/package/@realitycollective/service-framework) — `ServiceManager`, `BaseService`/`BaseEventService`, tokens, DI registration — plus [`@realitycollective/service-framework-iwsdk`](https://www.npmjs.com/package/@realitycollective/service-framework-iwsdk) (the `startServiceRuntime` bootstrap + `ServiceBridgeSystem` + frame adapter). **Nothing is vendored in this repo.** |
 
-The client wires these with **dependency injection**: systems resolve services by
-interface token (`getService(IWebRTCService)`) from the `ServiceManager`; they
-never import concrete service classes. Swap the host (IWSDK → a DOM overlay →
-tests) and reuse the library unchanged.
+The client wires these with **dependency injection**: `startServiceRuntime` builds
+the `ServiceManager` from the service profile; systems resolve services by
+interface token (`manager.resolve(IWebRTCService)`); they never import concrete
+service classes. Per-frame ticks and XR focus/pause come from the `-iwsdk`
+`ServiceBridgeSystem`. Swap the host (IWSDK → a DOM overlay → tests) and reuse the
+library unchanged.
 
 ### Server side (`V2/QuestVisionStreamServer/`, Python)
 

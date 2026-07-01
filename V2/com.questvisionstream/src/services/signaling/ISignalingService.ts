@@ -1,13 +1,10 @@
-import type { IService } from '@realitycollective/service-framework-ts';
-import { createServiceToken } from '@realitycollective/service-framework-ts';
-import type { Emitter } from '../../util/Emitter';
+import type { IEventService } from '@realitycollective/service-framework';
+import { createServiceToken } from '@realitycollective/service-framework';
 
 /**
- * Signaling wire messages. These mirror exactly what `webrtc_server.py` exchanges
- * over the WebSocket. Note the ICE `candidate` string is carried **without** the
- * `candidate:` SDP prefix — aiortc emits and expects it that way. The
- * {@link IWebRTCService} is responsible for stripping the prefix on send and
- * re-adding it on receive; the signaling layer is a dumb JSON transport.
+ * Signaling wire messages — mirror exactly what `webrtc_server.py` exchanges over
+ * the WebSocket. The ICE `candidate` string is carried WITHOUT the `candidate:`
+ * SDP prefix (aiortc's form); {@link IWebRTCService} strips/re-adds it.
  */
 export interface OfferMessage {
   type: 'offer';
@@ -19,7 +16,6 @@ export interface AnswerMessage {
 }
 export interface CandidateMessage {
   type: 'candidate';
-  /** SDP candidate line WITHOUT the leading `candidate:` token. */
   candidate: string;
   sdpMid: string | null;
   sdpMLineIndex: number;
@@ -29,24 +25,27 @@ export type SignalingOutbound = OfferMessage | CandidateMessage;
 export type SignalingInbound = AnswerMessage | CandidateMessage;
 
 /**
- * Transport for the WebRTC handshake. Owns the WebSocket connection and provides
- * typed send + inbound event streams. Reconnection is handled internally.
+ * Typed event surface (RealityCollective `IEventService`). Declared as a `type`
+ * (not `interface`) so it satisfies the framework's `Record<string, unknown>`
+ * event-map constraint.
  */
-export interface ISignalingService extends IService {
+export type SignalingEventMap = {
+  /** Inbound answer/candidate from the server. */
+  message: SignalingInbound;
+  /** Socket opened. */
+  connected: undefined;
+  /** Socket closed (with close code). */
+  disconnected: number;
+};
+
+/**
+ * WebSocket transport for the WebRTC handshake. A RealityCollective service:
+ * lifecycle + events come from `BaseEventService`.
+ */
+export interface ISignalingService extends IEventService<SignalingEventMap> {
   readonly isConnected: boolean;
-
-  /** Inbound messages from the server (answer / candidate). */
-  readonly messages: Emitter<SignalingInbound>;
-  /** Fires when the socket opens. */
-  readonly connected: Emitter<void>;
-  /** Fires when the socket closes (with the close code). */
-  readonly disconnected: Emitter<number>;
-
-  /** Open the socket (no-op if already connecting/open). */
   connect(): Promise<void>;
-  /** Close the socket and stop reconnecting. */
   disconnect(): void;
-  /** Send a signaling message to the server. */
   send(message: SignalingOutbound): void;
 }
 

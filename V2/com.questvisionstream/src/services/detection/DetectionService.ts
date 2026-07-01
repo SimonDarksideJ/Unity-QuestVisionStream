@@ -1,30 +1,35 @@
-import { BaseService } from '@realitycollective/service-framework-ts';
-import { Emitter } from '../../util/Emitter';
+import {
+  BaseEventService,
+  type ServiceActivationContext,
+} from '@realitycollective/service-framework';
 import { createLogger } from '../../util/logger';
 import type { IWebRTCService } from '../webrtc/IWebRTCService';
-import type { IDetectionService } from './IDetectionService';
+import type { DetectionEventMap, IDetectionService } from './IDetectionService';
 import { isDetectionsPayload, type DetectionsPayload } from './types';
 
 const log = createLogger('Detection');
 
+export interface DetectionConfig {
+  /** Rolling window (ms) for the detections-per-second estimate. Default 1000. */
+  readonly throughputWindowMs?: number;
+}
+
 /**
  * Consumes raw detection messages from the {@link IWebRTCService}, validates and
- * republishes them as typed {@link DetectionsPayload}s, and tracks frame size +
- * throughput. Depends on the WebRTC service (constructor-injected).
+ * republishes them, and tracks frame size + throughput (from arrival timestamps,
+ * so no per-frame tick is needed).
  */
-export class DetectionService extends BaseService implements IDetectionService {
-  readonly detections = new Emitter<DetectionsPayload>();
-
+export class DetectionService
+  extends BaseEventService<DetectionEventMap, DetectionConfig>
+  implements IDetectionService
+{
   private readonly webrtc: IWebRTCService;
   private _lastFrameSize: { width: number; height: number } | undefined;
-  private _dps = 0;
-  private windowCount = 0;
-  private windowStart = 0;
+  private readonly arrivals: number[] = [];
   private unsub: (() => void) | undefined;
 
-  constructor(webrtc: IWebRTCService) {
-    // Priority 30: after the WebRTC service that feeds it.
-    super('DetectionService', 30);
+  constructor(context: ServiceActivationContext<DetectionConfig>, webrtc: IWebRTCService) {
+    super(context);
     this.webrtc = webrtc;
   }
 
@@ -33,29 +38,17 @@ export class DetectionService extends BaseService implements IDetectionService {
   }
 
   get detectionsPerSecond(): number {
-    return this._dps;
+    this.trim();
+    return this.arrivals.length;
   }
 
-  override async start(): Promise<void> {
-    await super.start();
-    this.unsub = this.webrtc.detectionMessages.on((raw) => this.handle(raw));
+  override start(): void {
+    this.unsub = this.webrtc.on('detectionMessage', (raw) => this.handle(raw));
   }
 
-  override update(_delta: number): void {
-    // Roll the throughput window once per second.
-    const now = performance.now();
-    if (this.windowStart === 0) this.windowStart = now;
-    if (now - this.windowStart >= 1000) {
-      this._dps = this.windowCount;
-      this.windowCount = 0;
-      this.windowStart = now;
-    }
-  }
-
-  override async destroy(): Promise<void> {
+  override destroy(): void {
     this.unsub?.();
-    this.detections.clear();
-    await super.destroy();
+    super.destroy();
   }
 
   private handle(raw: string): void {
@@ -68,11 +61,18 @@ export class DetectionService extends BaseService implements IDetectionService {
     }
     if (!isDetectionsPayload(parsed)) return;
 
-    const payload = parsed;
+    const payload: DetectionsPayload = parsed;
     if (payload.width > 0 && payload.height > 0) {
       this._lastFrameSize = { width: payload.width, height: payload.height };
     }
-    this.windowCount += 1;
-    this.detections.emit(payload);
+    this.arrivals.push(performance.now());
+    this.trim();
+    this.emit('detections', payload);
+  }
+
+  private trim(): void {
+    const windowMs = this.serviceConfig.throughputWindowMs ?? 1000;
+    const cutoff = performance.now() - windowMs;
+    while (this.arrivals.length && this.arrivals[0]! < cutoff) this.arrivals.shift();
   }
 }

@@ -2,28 +2,31 @@
  * @questvisionstream/client
  *
  * Reusable, host-agnostic streaming client for QuestVisionStream, built as a
- * graph of RealityCollective Service Framework services. It speaks the exact
- * WebRTC + data-channel protocol of `QuestVisionStreamServer` and exposes a
- * framework-agnostic rendering seam so any WebXR/browser host (IWSDK, a DOM
- * overlay, tests) can consume detections.
+ * graph of RealityCollective Service Framework services
+ * (`@realitycollective/service-framework`). Speaks the exact WebRTC +
+ * data-channel protocol of `QuestVisionStreamServer` and exposes a
+ * framework-agnostic rendering seam.
  *
- * Quick start:
+ * Quick start (IWSDK host):
  * ```ts
- * const qvs = new QuestVisionStreamClient({ signalingUrl: 'ws://host:3000' });
- * await qvs.start();
- * await qvs.connect(cameraMediaStream);
- * qvs.onDetections((payload) => renderer.renderDetections(toRenderBatch(payload)));
- * // each frame: qvs.update(deltaSeconds);
+ * import { startServiceRuntime } from '@realitycollective/service-framework-iwsdk';
+ * import { createQuestVisionStreamProfile } from '@questvisionstream/client';
+ * const { manager, adapter } = startServiceRuntime(world, (adapter) =>
+ *   createQuestVisionStreamProfile('quest-vision-stream', { signalingUrl }, adapter));
  * ```
  */
 
-// Orchestration facade
+// Orchestration — the service profile / registrations
 export {
-  QuestVisionStreamClient,
-  type QuestVisionStreamConfig,
-} from './orchestration/QuestVisionStreamClient';
+  createQuestVisionStreamProfile,
+  createQuestVisionStreamRegistrations,
+  type QuestVisionStreamOptions,
+} from './orchestration/profile';
 
-// Services + interface tokens
+// Frame-source contract (structural; satisfied by the IWSDK adapter)
+export type { FrameSource, FrameTick } from './frame-source';
+
+// Services — interface tokens, event maps, classes + configs
 export { ISignalingService } from './services/signaling/ISignalingService';
 export type {
   OfferMessage,
@@ -31,10 +34,12 @@ export type {
   CandidateMessage,
   SignalingInbound,
   SignalingOutbound,
+  SignalingEventMap,
 } from './services/signaling/ISignalingService';
 export { SignalingService, type SignalingConfig } from './services/signaling/SignalingService';
 
-export { IWebRTCService, type WebRTCConnectionState } from './services/webrtc/IWebRTCService';
+export { IWebRTCService } from './services/webrtc/IWebRTCService';
+export type { WebRTCConnectionState, WebRTCEventMap } from './services/webrtc/IWebRTCService';
 export {
   WebRTCService,
   type WebRTCConfig,
@@ -42,7 +47,8 @@ export {
 } from './services/webrtc/WebRTCService';
 
 export { IDetectionService } from './services/detection/IDetectionService';
-export { DetectionService } from './services/detection/DetectionService';
+export type { DetectionEventMap } from './services/detection/IDetectionService';
+export { DetectionService, type DetectionConfig } from './services/detection/DetectionService';
 export {
   isDetectionsPayload,
   type Detection,
@@ -51,7 +57,10 @@ export {
 } from './services/detection/types';
 
 export { IImageQualifierService } from './services/qualifier/IImageQualifierService';
-export type { QualifierFrameProvider } from './services/qualifier/IImageQualifierService';
+export type {
+  QualifierEventMap,
+  QualifierFrameProvider,
+} from './services/qualifier/IImageQualifierService';
 export {
   ImageQualifierService,
   type ImageQualifierConfig,
@@ -64,10 +73,11 @@ export type {
 } from './services/qualifier/types';
 export {
   BrightnessQualifierModule,
+  IBrightnessQualifierModule,
   type BrightnessQualifierConfig,
 } from './services/qualifier/modules/BrightnessQualifierModule';
 
-// Rendering seam + math
+// Rendering seam + math (framework-agnostic)
 export type { IDetectionRenderer } from './rendering/IDetectionRenderer';
 export type {
   Vec3,
@@ -86,5 +96,4 @@ export {
 } from './rendering/DetectionMath';
 
 // Utilities
-export { Emitter, type Listener } from './util/Emitter';
 export { createLogger, setLogLevel, type LogLevel, type Logger } from './util/logger';

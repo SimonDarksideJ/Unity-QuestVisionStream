@@ -8,17 +8,19 @@ lives here under `V2/`.
 
 ```
 V2/
-├── service-framework/        # @realitycollective/service-framework-ts
-│                             #   Faithful TS port of the RealityCollective Service
-│                             #   Framework architecture (ServiceManager DI + lifecycle).
 ├── com.questvisionstream/    # @questvisionstream/client  (the reusable library)
-│                             #   Streaming client as Service Framework services;
-│                             #   file-linked into the Quest client.
+│                             #   Streaming client as RealityCollective Service
+│                             #   Framework services; file-linked into the client.
 ├── quest-client/             # Meta IWSDK WebXR app (the new Quest client)
 │                             #   Thin host that wires the library into IWSDK's ECS.
 ├── QuestVisionStreamServer/  # Modernized Python inference server.
 └── Documentation/            # Install + deployment guides (see below).
 ```
+
+The DI backbone is the **published** [`@realitycollective/service-framework`](https://www.npmjs.com/package/@realitycollective/service-framework)
+(+ [`@realitycollective/service-framework-iwsdk`](https://www.npmjs.com/package/@realitycollective/service-framework-iwsdk)
+bindings) pulled from npm — nothing for it is vendored in this repo. Only
+`com.questvisionstream` is file-linked (it is not published).
 
 ## Documentation
 
@@ -37,7 +39,7 @@ Two "app" folders as requested — the **Quest client** and the updated
 
 ```
 ┌─────────────────────── quest-client (IWSDK / Three.js ECS) ───────────────────────┐
-│  ServicePumpSystem ──▶ ServiceManager.update(dt)                                   │
+│  ServiceBridgeSystem (-iwsdk) ──▶ adapter.onFrame + focus/pause                    │
 │  CameraStreamSystem ──▶ CameraSource → MediaStream ─┐        DetectionRenderSystem  │
 │                          + edge quality gate        │        (IDetectionRenderer)   │
 └─────────────────────────────────────────────────────┼────────────────▲─────────────┘
@@ -54,8 +56,9 @@ Two "app" folders as requested — the **Quest client** and the updated
 ```
 
 - **DI throughout:** every streaming concern is a `ServiceManager`-orchestrated
-  service, resolved by **interface token** (`getService(IWebRTCService)`). IWSDK
-  systems consume services by token; they never import a concrete service class.
+  service, resolved by **interface token** (`manager.resolve(IWebRTCService)`).
+  IWSDK systems consume services by token; they never import a concrete service
+  class. Per-frame ticks + XR focus/pause come from the `-iwsdk` `ServiceBridgeSystem`.
 - **Reusability:** all streaming logic is in `com.questvisionstream`, file-linked
   (`file:../com.questvisionstream`) into the client. Swap the host (IWSDK, a DOM
   overlay, tests) and reuse the library unchanged.

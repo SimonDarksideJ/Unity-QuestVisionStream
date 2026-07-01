@@ -1,41 +1,44 @@
-import { BaseService } from '@realitycollective/service-framework-ts';
-import { Emitter } from '../../util/Emitter';
+import {
+  BaseEventService,
+  type IServiceModule,
+  type ServiceActivationContext,
+} from '@realitycollective/service-framework';
+import type { FrameSource } from '../../frame-source';
 import type {
   IImageQualifierService,
+  QualifierEventMap,
   QualifierFrameProvider,
 } from './IImageQualifierService';
 import type { IImageQualifierModule, QualifierMetric, QualityReport } from './types';
 
 export interface ImageQualifierConfig {
+  /** Per-frame tick source (the IWSDK adapter). */
+  readonly frameSource: FrameSource;
   /** Sampling interval in ms. Default 100 (10 Hz). */
   readonly sampleIntervalMs?: number;
 }
 
-/**
- * Orchestrates qualifier modules (data providers). Each `sampleIntervalMs` it
- * pulls a downsampled frame from the provider, runs every active module, and
- * emits an aggregate {@link QualityReport}. The aggregate `ok` is a logical AND
- * and the aggregate score is the weakest module's score.
- */
-export class ImageQualifierService extends BaseService implements IImageQualifierService {
-  readonly qualityChanged = new Emitter<QualityReport>();
+function isQualifierModule(m: IServiceModule): m is IImageQualifierModule {
+  return typeof (m as IImageQualifierModule).evaluate === 'function';
+}
 
-  private readonly sampleIntervalMs: number;
+/**
+ * Orchestrates qualifier modules (data providers). On each frame tick it
+ * accumulates time and, every `sampleIntervalMs`, pulls a downsampled frame from
+ * the provider, runs every module, and emits an aggregate {@link QualityReport}
+ * (ok = logical AND, score = weakest module).
+ */
+export class ImageQualifierService
+  extends BaseEventService<QualifierEventMap, ImageQualifierConfig>
+  implements IImageQualifierService
+{
   private provider: QualifierFrameProvider | undefined;
   private _lastReport: QualityReport | undefined;
-  private sinceSample = 0;
+  private sinceSampleMs = 0;
+  private unsub: (() => void) | undefined;
 
-  constructor(config: ImageQualifierConfig = {}) {
-    // Priority 15: between signaling (10) and webrtc (20) — the gate is consulted
-    // before frames are streamed.
-    super('ImageQualifierService', 15);
-    this.sampleIntervalMs = config.sampleIntervalMs ?? 100;
-  }
-
-  /** Attach an analyzer module (data provider). Chainable. */
-  use(module: IImageQualifierModule): this {
-    this.registerModule(module);
-    return this;
+  constructor(context: ServiceActivationContext<ImageQualifierConfig>) {
+    super(context);
   }
 
   get lastReport(): QualityReport | undefined {
@@ -43,7 +46,7 @@ export class ImageQualifierService extends BaseService implements IImageQualifie
   }
 
   get shouldStream(): boolean {
-    // Default to true before the first sample so streaming isn't blocked at start.
+    // Default true before the first sample so streaming isn't blocked at start.
     return this._lastReport?.ok ?? true;
   }
 
@@ -51,21 +54,30 @@ export class ImageQualifierService extends BaseService implements IImageQualifie
     this.provider = provider;
   }
 
-  override update(delta: number): void {
-    super.update(delta); // drive modules' own update hooks
-    if (!this.provider) return;
+  override start(): void {
+    this.unsub = this.serviceConfig.frameSource.onFrame((tick) => this.onTick(tick.delta));
+  }
 
-    this.sinceSample += delta * 1000;
-    if (this.sinceSample < this.sampleIntervalMs) return;
-    this.sinceSample = 0;
+  override destroy(): void {
+    this.unsub?.();
+    super.destroy();
+  }
+
+  private get qualifierModules(): IImageQualifierModule[] {
+    return this.serviceModules.filter(isQualifierModule);
+  }
+
+  private onTick(deltaSeconds: number): void {
+    if (!this.provider) return;
+    this.sinceSampleMs += deltaSeconds * 1000;
+    const interval = this.serviceConfig.sampleIntervalMs ?? 100;
+    if (this.sinceSampleMs < interval) return;
+    this.sinceSampleMs = 0;
 
     const frame = this.provider();
     if (!frame) return;
 
-    const metrics: QualifierMetric[] = [];
-    for (const m of this.activeModules) {
-      metrics.push((m as IImageQualifierModule).evaluate(frame));
-    }
+    const metrics: QualifierMetric[] = this.qualifierModules.map((m) => m.evaluate(frame));
     if (metrics.length === 0) return;
 
     const report: QualityReport = {
@@ -75,12 +87,6 @@ export class ImageQualifierService extends BaseService implements IImageQualifie
       timestamp: performance.now(),
     };
     this._lastReport = report;
-    this.qualityChanged.emit(report);
-  }
-
-  override async destroy(): Promise<void> {
-    this.qualityChanged.clear();
-    this.provider = undefined;
-    await super.destroy();
+    this.emit('quality', report);
   }
 }

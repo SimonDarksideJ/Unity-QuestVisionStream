@@ -20,10 +20,11 @@
   },
   "keywords": ["webxr", "webrtc", "quest", "object-detection", "yolo", "iwsdk", "service-framework"],
   "license": "MIT",
-  "dependencies": {
-    "@realitycollective/service-framework-ts": "file:../service-framework"
+  "peerDependencies": {
+    "@realitycollective/service-framework": "^1.0.0"
   },
   "devDependencies": {
+    "@realitycollective/service-framework": "^1.0.0",
     "typescript": "^5.5.4"
   }
 }

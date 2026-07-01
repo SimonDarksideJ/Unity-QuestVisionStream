@@ -16,19 +16,21 @@ library; this app is the thin IWSDK host that wires it in.
 
 ```
 IWSDK World (Three.js + ECS)
-├── ServicePumpSystem      → pumps the ServiceManager each frame
+├── ServiceBridgeSystem    → (from @realitycollective/service-framework-iwsdk)
+│                            per-frame ticks + XR focus/pause into the ServiceManager
 ├── CameraStreamSystem     → CameraSource → MediaStream → IWebRTCService
 │                            + qualifier frame provider + edge quality gate
 └── DetectionRenderSystem  → IDetectionRenderer: detections → world-anchored tags
 
-Service Framework (DI, in the linked library)
+RealityCollective Service Framework (DI) — services in the linked library
    ISignalingService → IImageQualifierService → IWebRTCService → IDetectionService
 ```
 
-Systems resolve services **by interface token** from the shared `ServiceManager`
-(`ServiceManager.instance.getService(IWebRTCService)`) — they never import a
-concrete service class. Construction/registration happens once via the
-`QuestVisionStreamClient` facade in `src/index.ts`.
+The service graph is stood up by `startServiceRuntime(world, …)` from
+`@realitycollective/service-framework-iwsdk` (in `src/index.ts`), using the
+library's `createQuestVisionStreamProfile`. Systems resolve services **by interface
+token** from the `ServiceManager` (`manager.resolve(IWebRTCService)`) — they never
+import a concrete service class.
 
 ## Key behaviours recreated from the Unity reference
 

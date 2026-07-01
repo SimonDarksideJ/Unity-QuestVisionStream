@@ -1,4 +1,9 @@
-import { BaseServiceModule, type IService } from '@realitycollective/service-framework-ts';
+import {
+  BaseServiceModule,
+  createServiceToken,
+  type ServiceActivationContext,
+} from '@realitycollective/service-framework';
+import type { IImageQualifierService } from '../IImageQualifierService';
 import type { IImageQualifierModule, QualifierFrame, QualifierMetric } from '../types';
 
 export interface BrightnessQualifierConfig {
@@ -10,26 +15,36 @@ export interface BrightnessQualifierConfig {
   readonly bufferSize?: number;
 }
 
+/** Token for the brightness module (registered under the qualifier service). */
+export const IBrightnessQualifierModule =
+  createServiceToken<IImageQualifierModule>('IBrightnessQualifierModule');
+
 /**
- * Scores frame brightness using Rec.709 luminance, mirroring the Unity
- * `BrightnessEstimationManager` (weights 0.2126 R, 0.7152 G, 0.0722 B), smoothed
- * over a ring buffer. Flags frames that are too dark or over-exposed for
- * reliable detection.
+ * Scores frame brightness using Rec.709 luminance (weights 0.2126 R / 0.7152 G /
+ * 0.0722 B), smoothed over a ring buffer — ported from the Unity
+ * `BrightnessEstimationManager`. Flags too-dark / over-exposed frames.
  */
-export class BrightnessQualifierModule extends BaseServiceModule implements IImageQualifierModule {
-  private readonly minLuma: number;
-  private readonly maxLuma: number;
-  private readonly bufferSize: number;
+export class BrightnessQualifierModule
+  extends BaseServiceModule<IImageQualifierService, BrightnessQualifierConfig>
+  implements IImageQualifierModule
+{
   private readonly history: number[] = [];
 
-  constructor(parent: IService, config: BrightnessQualifierConfig = {}) {
-    super('BrightnessQualifierModule', parent, 10);
-    this.minLuma = config.minLuma ?? 40;
-    this.maxLuma = config.maxLuma ?? 230;
-    this.bufferSize = config.bufferSize ?? 10;
+  constructor(
+    context: ServiceActivationContext<BrightnessQualifierConfig, IImageQualifierService>,
+  ) {
+    super(context);
+  }
+
+  private get cfg(): BrightnessQualifierConfig {
+    return this.serviceConfig;
   }
 
   evaluate(frame: QualifierFrame): QualifierMetric {
+    const minLuma = this.cfg.minLuma ?? 40;
+    const maxLuma = this.cfg.maxLuma ?? 230;
+    const bufferSize = this.cfg.bufferSize ?? 10;
+
     const { data } = frame;
     let sum = 0;
     const pixels = data.length / 4;
@@ -38,19 +53,17 @@ export class BrightnessQualifierModule extends BaseServiceModule implements IIma
     }
     const luma = pixels > 0 ? sum / pixels : 0;
 
-    // Smooth over the ring buffer.
     this.history.push(luma);
-    if (this.history.length > this.bufferSize) this.history.shift();
+    if (this.history.length > bufferSize) this.history.shift();
     const smoothed = this.history.reduce((a, b) => a + b, 0) / this.history.length;
 
-    const tooDark = smoothed < this.minLuma;
-    const tooBright = smoothed > this.maxLuma;
+    const tooDark = smoothed < minLuma;
+    const tooBright = smoothed > maxLuma;
     const ok = !tooDark && !tooBright;
 
-    // Score: 1.0 in the comfortable middle, ramping to 0 at the limits.
     let score: number;
-    if (smoothed < this.minLuma) score = Math.max(0, smoothed / this.minLuma);
-    else if (smoothed > this.maxLuma) score = Math.max(0, (255 - smoothed) / (255 - this.maxLuma));
+    if (tooDark) score = Math.max(0, smoothed / minLuma);
+    else if (tooBright) score = Math.max(0, (255 - smoothed) / (255 - maxLuma));
     else score = 1;
 
     return {
@@ -58,7 +71,7 @@ export class BrightnessQualifierModule extends BaseServiceModule implements IIma
       value: smoothed,
       score,
       ok,
-      detail: tooDark ? 'too dark' : tooBright ? 'over-exposed' : undefined,
+      ...(tooDark ? { detail: 'too dark' } : tooBright ? { detail: 'over-exposed' } : {}),
     };
   }
 
