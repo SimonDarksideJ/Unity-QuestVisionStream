@@ -31,12 +31,36 @@ The `IImageQualifierService` composes **service modules** (data providers) —
 
 ## Protocol fidelity
 
-- Wire types (`Detection`, `DetectionsPayload`) are byte-identical to the server
-  and the Unity `DetectionsPayload`/`Detection`, so one server serves both clients.
+- Wire types (`Detection`, `DetectionsPayload`) match the server and the Unity
+  `DetectionsPayload`/`Detection`, so one server serves both clients. The
+  additive `pts` field (media timestamp of the processed frame, 90 kHz RTP
+  units) is typed and validated for capture-frame correlation.
+- Payloads are strictly validated at the boundary (`isDetectionsPayload`
+  checks every numeric field, bbox elements included) — a payload that passes
+  can never produce NaN coordinates in `DetectionMath`.
 - The **client** creates the `detections` `RTCDataChannel`; the server only
   listens. The client is the offerer and adds the camera video track.
 - aiortc carries ICE candidate lines **without** the `candidate:` SDP prefix;
-  `WebRTCService` strips it on send and re-adds it on receive.
+  `WebRTCService` strips it on send and re-adds it on receive. Remote
+  candidates that arrive before the answer is applied are queued and applied
+  in order (never dropped).
+
+## Connection lifecycle guarantees
+
+Hardened in the 2026-07 pass (see
+[`../Documentation/improvements/`](../Documentation/improvements/README.md)),
+all covered by tests:
+
+- `await signaling.connect()` means the socket is **OPEN** — an offer sent
+  right after it can never be dropped by a still-connecting socket. Concurrent
+  calls share the in-flight attempt.
+- **Automatic session recovery:** when the peer connection reaches `failed`,
+  or signaling reconnects while the session never completed, `WebRTCService`
+  re-offers after `reconnectDelayMs` (default 2000 ms). Disable with
+  `autoReconnect: false`; an explicit `close()` always stops recovery.
+- Signaling reconnects with bounded backoff; late events from superseded
+  sockets are ignored (no spurious `disconnected`, no double reconnect).
+- No fire-and-forget path can surface an unhandled promise rejection.
 
 ## Usage
 
@@ -82,13 +106,22 @@ centers + rects) via `toRenderBatch` / `normalizeDetection`, and provides a
 client). The **host** implements `IDetectionRenderer.renderDetections()` to place
 world-anchored tags (IWSDK hit-test/unprojection) or draw 2D overlay boxes.
 
-## Build
+The normalizer supports `invertY` (server v-flip, default on) and `invertX`
+(mirrored streams / `QVS_FLIP_HORIZONTAL`, default off).
+
+## Build & test
 
 ```bash
 npm install         # pulls @realitycollective/service-framework from npm
-npm run typecheck
+npm run typecheck   # src + tests
+npm test            # vitest — browser seams (WebSocket/RTCPeerConnection) are mocked
 npm run build       # emits dist/
 ```
+
+The suite runs in Node with the browser APIs stubbed at the global seam, so
+every network/WebRTC behaviour is scriptable (connect races, early ICE
+candidates, socket failures). CI runs it on every PR/push touching `V2/` —
+see `.github/workflows/v2-tests.yml`.
 
 Depends on the published `@realitycollective/service-framework` (npm). The IWSDK
 host additionally uses `@realitycollective/service-framework-iwsdk`.

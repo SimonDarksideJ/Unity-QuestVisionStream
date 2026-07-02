@@ -107,6 +107,12 @@ Cloudflare GPU) are correctly reasoned.
 
 ### Library
 
+> **Status update (2026-07):** L1–L4, the payload-validation and invertX
+> weaknesses, the qualifier silent-inert trap, and the missing session-recovery
+> story were fixed test-first in the library hardening pass — see
+> [improvements/2026-07-Library-Hardening.md](improvements/2026-07-Library-Hardening.md).
+> Kept as written for the historical record.
+
 | # | Severity | Location | Issue |
 |---|----------|----------|-------|
 | L1 | **High** | `SignalingService.ts:58-63` + `WebRTCService.ts:77,107` | **Offer silently dropped in the autoConnect race.** `connect()` resolves immediately when the socket is merely `CONNECTING`, but `send()` drops anything unless `OPEN`. If the camera goes Active before the WS handshake completes (or during a reconnect window), the offer is logged-and-dropped and — because there is no retry/renegotiation anywhere — the session never connects, silently. Timing-dependent but real, and its failure mode is permanent. |

@@ -33,6 +33,8 @@ export class SignalingService
   implements ISignalingService
 {
   private socket: WebSocket | undefined;
+  /** Open-promise for the in-flight CONNECTING socket, shared by all callers. */
+  private pendingOpen: Promise<void> | undefined;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private closedByUser = false;
@@ -50,41 +52,70 @@ export class SignalingService
   }
 
   override start(): void {
-    if (this.cfg.autoConnect ?? true) void this.connect();
+    // Attach a catch: an initial connect failure must not surface as an
+    // unhandled rejection (onclose schedules the retry).
+    if (this.cfg.autoConnect ?? true) {
+      void this.connect().catch((err) => log.warn('Initial connect failed', err));
+    }
   }
 
+  /**
+   * Contract: the returned promise resolves only once the socket is OPEN (so
+   * `await connect()` always means "safe to send"), and rejects if this
+   * connection attempt fails. Concurrent calls share the in-flight attempt.
+   */
   connect(): Promise<void> {
     this.closedByUser = false;
-    if (
-      this.socket &&
-      (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)
-    ) {
-      return Promise.resolve();
+    if (this.socket) {
+      if (this.socket.readyState === WebSocket.OPEN) return Promise.resolve();
+      if (this.socket.readyState === WebSocket.CONNECTING && this.pendingOpen) {
+        return this.pendingOpen;
+      }
     }
 
-    return new Promise<void>((resolve, reject) => {
+    const promise = new Promise<void>((resolve, reject) => {
       log.info(`Connecting to ${this.cfg.url}`);
       const socket = new WebSocket(this.cfg.url);
       this.socket = socket;
+      let settled = false;
 
       socket.onopen = () => {
+        if (this.socket !== socket) return; // superseded while connecting
         log.info('Connected');
+        this.pendingOpen = undefined;
         this.reconnectAttempt = 0;
         this.emit('connected', undefined);
+        settled = true;
         resolve();
       };
-      socket.onmessage = (event) => this.handleMessage(event.data);
+      socket.onmessage = (event) => {
+        if (this.socket === socket) this.handleMessage(event.data);
+      };
       socket.onerror = () => {
         if (this.socket === socket && socket.readyState !== WebSocket.OPEN) {
+          this.pendingOpen = undefined;
+          settled = true;
           reject(new Error('Signaling socket error'));
         }
       };
       socket.onclose = (event) => {
+        // Settle the open-promise regardless of staleness so no caller hangs.
+        if (!settled) {
+          settled = true;
+          if (this.pendingOpen === promise) this.pendingOpen = undefined;
+          reject(new Error(`Signaling socket closed before opening (code ${event.code})`));
+        }
+        // A late close from a superseded socket must not look like a live
+        // disconnect (and must not double-schedule reconnects).
+        if (this.socket !== socket) return;
+        this.socket = undefined;
         log.info(`Disconnected (code ${event.code})`);
         this.emit('disconnected', event.code);
         if (!this.closedByUser) this.scheduleReconnect();
       };
     });
+    this.pendingOpen = promise;
+    return promise;
   }
 
   disconnect(): void {
@@ -93,6 +124,7 @@ export class SignalingService
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
+    this.pendingOpen = undefined;
     this.socket?.close();
     this.socket = undefined;
   }

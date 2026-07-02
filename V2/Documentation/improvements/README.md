@@ -54,6 +54,18 @@ Every improvement pass follows the same three-step loop:
   ignorable by existing clients (Unity `JsonUtility` and the TS guard both
   ignore unknown fields). Never rename or re-type an existing field without a
   coordinated client change.
+- **Mock the platform seam, not the library.** For browser-API code
+  (WebSocket, RTCPeerConnection), stub the globals with scriptable doubles
+  that *enforce the platform's contracts* (e.g. `addIceCandidate` throws
+  before the remote description is set). Timing races become deterministic
+  red tests instead of flaky field bugs.
+- **Lock baselines before fixing.** Write passing tests for the behaviour a
+  review verified as correct *first* — they pin it so the fixes can't regress
+  it unnoticed. In the library pass, 21 of 36 tests were baseline locks.
+- **Fix shared-layer gaps in the shared layer.** Session recovery could have
+  been patched in the quest-client, but every future host would inherit the
+  gap; the re-offer state machine belongs in the library next to the state it
+  reasons about.
 
 ## How to add an entry
 
@@ -69,3 +81,4 @@ Every improvement pass follows the same three-step loop:
 | Entry | Scope | Headline results |
 |-------|-------|------------------|
 | [2026-07 — Server hardening](2026-07-Server-Hardening.md) | `QuestVisionStreamServer` (Python) | Event-loop stall 316ms → 8.4ms; live-edge lag 1631ms (unbounded) → 60ms (bounded); 6 robustness/security gaps closed; first test suite (18 tests) |
+| [2026-07 — Library hardening](2026-07-Library-Hardening.md) | `com.questvisionstream` (TypeScript) | Offer-drop connect race fixed; early ICE candidates 3/3 lost → 3/3 applied; mid-session drop permanent → auto re-offer; 2 unhandled-rejection paths → 0; strict payload validation; first test suite (36 tests) |

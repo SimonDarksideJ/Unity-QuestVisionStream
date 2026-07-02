@@ -4,12 +4,15 @@ import {
   type ServiceActivationContext,
 } from '@realitycollective/service-framework';
 import type { FrameSource } from '../../frame-source';
+import { createLogger } from '../../util/logger';
 import type {
   IImageQualifierService,
   QualifierEventMap,
   QualifierFrameProvider,
 } from './IImageQualifierService';
 import type { IImageQualifierModule, QualifierMetric, QualityReport } from './types';
+
+const log = createLogger('Qualifier');
 
 export interface ImageQualifierConfig {
   /** Per-frame tick source (the IWSDK adapter). */
@@ -36,6 +39,7 @@ export class ImageQualifierService
   private _lastReport: QualityReport | undefined;
   private sinceSampleMs = 0;
   private unsub: (() => void) | undefined;
+  private warnedNoProvider = false;
 
   constructor(context: ServiceActivationContext<ImageQualifierConfig>) {
     super(context);
@@ -52,6 +56,7 @@ export class ImageQualifierService
 
   setFrameProvider(provider: QualifierFrameProvider): void {
     this.provider = provider;
+    this.warnedNoProvider = false;
   }
 
   override start(): void {
@@ -68,7 +73,19 @@ export class ImageQualifierService
   }
 
   private onTick(deltaSeconds: number): void {
-    if (!this.provider) return;
+    if (!this.provider) {
+      // A wired tick source but no frame provider is the silent-inert
+      // misconfiguration: no report is ever produced and shouldStream stays
+      // true forever. Say so once, loudly.
+      if (!this.warnedNoProvider) {
+        this.warnedNoProvider = true;
+        log.warn(
+          'Frame ticks are arriving but no frame provider is set — call ' +
+            'setFrameProvider(); the qualifier is inert and shouldStream stays true.',
+        );
+      }
+      return;
+    }
     this.sinceSampleMs += deltaSeconds * 1000;
     const interval = this.serviceConfig.sampleIntervalMs ?? 100;
     if (this.sinceSampleMs < interval) return;
