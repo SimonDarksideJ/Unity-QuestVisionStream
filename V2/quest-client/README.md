@@ -102,3 +102,4 @@ panel.
 - Tests + hardening history: see
   [`../Documentation/improvements/2026-07-Client-Hardening.md`](../Documentation/improvements/2026-07-Client-Hardening.md).
   CI runs the suite on every PR/push touching `V2/` (`.github/workflows/v2-tests.yml`).
+
