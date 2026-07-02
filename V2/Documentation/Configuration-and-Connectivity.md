@@ -128,6 +128,22 @@ QVS_TURN_CREDENTIAL=pass
 **Tailscale sidesteps all of this** — it gives a direct path, so no TURN and no
 reverse proxy. Recommended for personal use.
 
+### Securing an exposed server
+
+Anything reachable beyond your LAN should also set (server side):
+
+```bash
+QVS_AUTH_TOKEN=some-long-random-string     # clients dial ...?token=some-long-random-string
+QVS_ALLOWED_ORIGINS=https://questvisionstream.pages.dev
+```
+
+The token rides in the signaling URL, so no client change is needed — set the
+KV/env `signaling_url` to `wss://host:3000/?token=…`. Unauthorized connections
+are closed with code 4401, disallowed origins with 4403. The server also caps
+concurrent sessions (`QVS_MAX_CONNECTIONS`, default 1); a new connection
+supersedes the oldest (close code 4000), so a crashed/slept headset never
+blocks its own reconnect.
+
 ---
 
 ## 6. Connectivity troubleshooting matrix

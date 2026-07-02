@@ -91,6 +91,12 @@ Cloudflare GPU) are correctly reasoned.
 
 ### Server
 
+> **Status update (2026-07):** S1–S5 and the server-side robustness/security
+> items below were fixed test-first in the server hardening pass — see
+> [improvements/2026-07-Server-Hardening.md](improvements/2026-07-Server-Hardening.md)
+> for the before/after evidence. The table is kept as originally written for
+> the historical record.
+
 | # | Severity | Location | Issue |
 |---|----------|----------|-------|
 | S1 | **High** | `video_processor.py:91` | **Synchronous inference blocks the entire event loop.** `self.detect(img)` runs the full model forward pass inline in the coroutine — no `run_in_executor`, no worker thread. During inference (seconds for Florence-2 on CPU) *everything* freezes: other peers, websocket ping/pong (risking self-inflicted ping timeouts), ICE, and the health endpoint. This is the single most consequential defect in V2. |

@@ -29,7 +29,11 @@ async def run() -> None:
 
     print(f"QuestVisionStream Server | detector={config.detector} | display={config.enable_display}")
 
-    # Load the model once and share it across connections.
+    # Load the model once and share it across connections. Stateful detectors
+    # (florence2, body) assume a single active stream — QVS_MAX_CONNECTIONS
+    # defaults to 1 and the newest connection supersedes the oldest, so shared
+    # state is never fed by two streams at once. The single inference worker
+    # thread (video_processor) additionally serializes access to the model.
     detector = get_detector(config.detector)
 
     def noop_send(_: dict) -> None:
