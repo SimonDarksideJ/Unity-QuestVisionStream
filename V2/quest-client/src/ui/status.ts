@@ -27,6 +27,46 @@ export type StatusField =
   | 'quality'
   | 'detections';
 
+/**
+ * Human-readable meaning for a WebSocket close code. The raw number (esp. the
+ * opaque `1006`) is useless on a headset; this turns it into an actionable
+ * cause. Codes: RFC 6455 §7.4 for the 1xxx range; 4xxx are this server's own
+ * (see QuestVisionStreamServer/webrtc_server.py — 4401 auth, 4403 origin, 4000
+ * superseded).
+ */
+export function describeCloseCode(code: number): string {
+  switch (code) {
+    case 1000:
+      return 'closed normally';
+    case 1001:
+      return 'server going away';
+    case 1006:
+      return 'no response — server unreachable (TLS/proxy/network); is `tailscale serve` up?';
+    case 1011:
+      return 'server error';
+    case 1015:
+      return 'TLS handshake failed (bad/missing cert)';
+    case 4000:
+      return 'superseded by a newer connection';
+    case 4401:
+      return 'unauthorized — bad/missing token';
+    case 4403:
+      return 'origin not allowed';
+    default:
+      return `code ${code}`;
+  }
+}
+
+/** Host portion of a ws(s):// URL for compact display, or the raw value. */
+function hostOf(url: string | undefined): string {
+  if (!url) return '(unset)';
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
+
 /** Display order for {@link StatusModel.lines}. */
 const FIELD_ORDER: readonly StatusField[] = [
   'server',
@@ -74,7 +114,9 @@ export class StatusModel {
       return `connection: ${connection}`;
     }
     const signaling = this.fields.get('signaling');
-    if (signaling?.includes('disconnected')) return `signaling: ${signaling}`;
+    if (signaling?.includes('retrying') || signaling?.includes("can't reach")) {
+      return `signaling: ${signaling}`;
+    }
     const quality = this.fields.get('quality');
     if (quality?.includes('paused')) return `quality: ${quality}`;
     if (connection && connection !== 'ready' && connection !== 'connected') {
@@ -116,10 +158,19 @@ export function wireStatusServices(model: StatusModel, services: StatusServices)
   const unsubs: Array<() => void> = [];
 
   if (services.signaling) {
-    unsubs.push(services.signaling.on('connected', () => model.set('signaling', 'connected')));
+    unsubs.push(
+      services.signaling.on('connected', () =>
+        model.set('signaling', `connected → ${hostOf(model.get('server'))}`),
+      ),
+    );
     unsubs.push(
       services.signaling.on('disconnected', (code) =>
-        model.set('signaling', `disconnected (code ${code}) — retrying`),
+        // Include the target host + a decoded cause so the AR HUD says *what*
+        // it can't reach and *why*, not just an opaque number.
+        model.set(
+          'signaling',
+          `can't reach ${hostOf(model.get('server'))} — ${describeCloseCode(code)} — retrying`,
+        ),
       ),
     );
   }

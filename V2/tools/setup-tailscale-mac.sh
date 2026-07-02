@@ -242,8 +242,15 @@ step "Exposing signaling over HTTPS/WSS via Tailscale serve"
 if $RESET; then
   info "Resetting existing serve config…"; "$TS" serve reset >/dev/null 2>&1 || true
 fi
-"$TS" serve --bg --https=443 "http://127.0.0.1:$SIGNAL_PORT" \
-  || die "tailscale serve failed. Ensure HTTPS certs are enabled for your tailnet (admin console → DNS → HTTPS Certificates)."
+"$TS" serve --bg --https=443 "http://127.0.0.1:$SIGNAL_PORT" 2>&1 | grep -vi '^$' || true
+# `serve --bg` exits 0 even when the tailnet REJECTS the request (e.g. HTTPS
+# certs disabled → "Serve is not enabled on your tailnet"). Trust the resulting
+# config, not the exit code: confirm a mapping actually exists.
+if ! "$TS" serve status 2>/dev/null | grep -q "127.0.0.1:$SIGNAL_PORT"; then
+  die "Tailscale serve did not take effect (no active mapping). Most likely HTTPS certificates are not enabled for this tailnet.
+       Fix: admin console → DNS → enable 'HTTPS Certificates' (needs MagicDNS), then re-run.
+       Verify manually: '$TS cert $FQDN' should NOT say 'account does not support getting TLS certs'."
+fi
 ok "Signaling served at $SIGNAL_URL"
 
 # Warm the cert so the first client connection doesn't stall on provisioning.

@@ -177,60 +177,59 @@ jobs:
             --commit-dirty=true
 
       - name: Publish short code + QR for the Quest
-        # The apex URL + QR is the guaranteed share (always works). The short link
-        # is a best-effort bonus, shown ONLY when the shortener returns a real URL
-        # — so we never print a broken link (the old da.gd path truncated the alias
-        # and produced dead links).
+        # Short link via da.gd (5-char domain → genuinely short, e.g. da.gd/qvs
+        # = 9 chars). is.gd/v.gd REJECT *.pages.dev ("database insert failed");
+        # tinyurl works but its domain alone is 12 chars, longer than the apex.
+        # da.gd isn't idempotent and codes can be squatted, so on "already taken"
+        # we reuse the alias ONLY if it still resolves to our apex; else fall back.
         if: steps.deploy.outcome == 'success'
         env:
           APEX_URL: https://questvisionstream.pages.dev
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+          ALIAS: qvs
         run: |
           set +e
-          ALIAS="questvisionstream"
           APEX="${APEX_URL}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
-          SHORT=""
-          APEX_HOST="${APEX#https://}"; APEX_HOST="${APEX_HOST#http://}"
+          ok_short() { case "$1" in https://da.gd/*|https://tinyurl.com/*) printf '%s' "$1"; return 0;; esac; return 1; }
+          APEX_HOST="$(disp "$APEX")"; APEX_HOST="${APEX_HOST%%/*}"
           enc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
-          # 1) Create the stable custom alias. is.gd has no "update", but our target
-          #    (the apex) is STABLE — so if the alias already exists AND still points
-          #    at our apex, it's ours from a previous run: reuse it (idempotent).
-          resp="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}&shorturl=${ALIAS}" 2>&1)"
-          echo "[shortcode] is.gd create '${ALIAS}': ${resp}"
-          case "$resp" in
-            https://is.gd/*) SHORT="$resp" ;;
-            *)
-              final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://is.gd/${ALIAS}" 2>/dev/null)"
-              echo "[shortcode] existing '${ALIAS}' -> ${final}"
-              case "$final" in
-                *"${APEX_HOST}"*) SHORT="https://is.gd/${ALIAS}"; echo "[shortcode] reusing existing (points at our apex)" ;;
-                *) echo "::notice title=Short link::is.gd/${ALIAS} is taken by another target; using an auto code instead." ;;
-              esac
-              ;;
-          esac
-          # 2) Fallback: auto-generated code (reliable; cannot collide).
+          SHORT=""
+          # 1) da.gd custom short alias (da.gd/${ALIAS}); reuse if already ours.
+          r="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${ALIAS}" 2>&1 | head -1)"; echo "[shortcode] da.gd '${ALIAS}': ${r}"; SHORT="$(ok_short "$r")"
           if [ -z "$SHORT" ]; then
-            resp2="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}" 2>&1)"
-            echo "[shortcode] is.gd auto: ${resp2}"
-            case "$resp2" in https://is.gd/*) SHORT="$resp2" ;; esac
+            final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://da.gd/${ALIAS}" 2>/dev/null)"
+            echo "[shortcode] existing da.gd/${ALIAS} -> ${final}"
+            case "$final" in *"${APEX_HOST}"*) SHORT="https://da.gd/${ALIAS}"; echo "[shortcode] reusing (points at our apex)";; esac
           fi
-          [ -z "$SHORT" ] && echo "::notice title=Short link::is.gd unavailable — the apex URL + QR still work."
-          qrenc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
+          # 2) Fallbacks: da.gd auto (short+stable) → tinyurl auto.
+          if [ -z "$SHORT" ]; then r="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}" 2>&1 | head -1)"; echo "[shortcode] da.gd auto: ${r}"; SHORT="$(ok_short "$r")"; fi
+          if [ -z "$SHORT" ]; then r="$(curl -sS --max-time 8 "https://tinyurl.com/api-create.php?url=${enc}" 2>&1)"; echo "[shortcode] tinyurl auto: ${r}"; SHORT="$(ok_short "$r")"; fi
+          [ -z "$SHORT" ] && echo "::notice title=Short link::No shortener available — the apex URL + QR still work."
           {
-            echo "## QuestVisionStream WebXR (PRODUCTION) — open on your Quest"
+            echo "## QuestVisionStream WebXR — PRODUCTION"
             echo ""
-            echo "Scan the QR or open the URL on the headset. The app reads its"
-            echo "streaming server from Cloudflare — see **Signaling server** below."
+            echo "The app reads its streaming server from Cloudflare (KV \`QVS_CONFIG\` / \`signaling_url\`, else the \`QVS_SIGNALING_URL\` env var). Per-open override: append \`?server=wss://HOST:3000\`."
             echo ""
-            echo "| | |"
-            echo "| --- | --- |"
-            echo "| **Open** | [\`$(disp "$APEX")\`](${APEX}) |"
-            [ -n "$SHORT" ] && echo "| **Short link** | [\`$(disp "$SHORT")\`](${SHORT}) |"
-            [ -n "${DEPLOY_URL}" ] && echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
-            echo "| **Signaling server** | set \`QVS_SIGNALING_URL\` in Cloudflare Pages → Settings → Variables (or append \`?server=wss://HOST:3000\`) |"
+            echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&data=${enc})"
             echo ""
-            echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
+            echo "---"
+            echo ""
+            # Big, headset-readable block LAST; lead with the SHORT link (fewest
+            # chars to type). H1 + inline code = the largest text summaries render,
+            # and the link is tappable if you open this page in the Quest browser.
+            echo "# 📺 Open on your Quest"
+            echo ""
+            if [ -n "$SHORT" ]; then
+              echo "# [\`$(disp "$SHORT")\`](${SHORT})"
+              echo ""
+              echo "### …or the full URL"
+              echo ""
+              echo "# [\`$(disp "$APEX")\`](${APEX})"
+            else
+              echo "# [\`$(disp "$APEX")\`](${APEX})"
+            fi
+            [ -n "${DEPLOY_URL}" ] && { echo ""; echo "<sub>This exact build: [$(disp "${DEPLOY_URL}")](${DEPLOY_URL})</sub>"; }
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------
@@ -345,49 +344,48 @@ jobs:
         env:
           APEX_URL: https://questvisionstream-test.pages.dev
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+          ALIAS: qvs-t
         run: |
-          # Apex + QR always; short link only if the shortener returns a real URL.
+          # Short link via da.gd (see prod step for why). Reuse the alias only if
+          # it still resolves to our apex — da.gd codes can be squatted.
           set +e
-          ALIAS="questvisionstreamtest"
           APEX="${APEX_URL}"
           disp() { local u="$1"; u="${u#https://}"; printf '%s' "${u#http://}"; }
-          SHORT=""
-          APEX_HOST="${APEX#https://}"; APEX_HOST="${APEX_HOST#http://}"
+          ok_short() { case "$1" in https://da.gd/*|https://tinyurl.com/*) printf '%s' "$1"; return 0;; esac; return 1; }
+          APEX_HOST="$(disp "$APEX")"; APEX_HOST="${APEX_HOST%%/*}"
           enc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
-          # Create the custom alias; reuse it if it already points at our stable apex
-          # (is.gd has no update, but our target never changes); else auto-generate.
-          resp="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}&shorturl=${ALIAS}" 2>&1)"
-          echo "[shortcode] is.gd create '${ALIAS}': ${resp}"
-          case "$resp" in
-            https://is.gd/*) SHORT="$resp" ;;
-            *)
-              final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://is.gd/${ALIAS}" 2>/dev/null)"
-              echo "[shortcode] existing '${ALIAS}' -> ${final}"
-              case "$final" in
-                *"${APEX_HOST}"*) SHORT="https://is.gd/${ALIAS}"; echo "[shortcode] reusing existing (points at our apex)" ;;
-                *) echo "::notice title=Short link::is.gd/${ALIAS} is taken by another target; using an auto code instead." ;;
-              esac
-              ;;
-          esac
+          SHORT=""
+          r="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}&shorturl=${ALIAS}" 2>&1 | head -1)"; echo "[shortcode] da.gd '${ALIAS}': ${r}"; SHORT="$(ok_short "$r")"
           if [ -z "$SHORT" ]; then
-            resp2="$(curl -sS --max-time 8 "https://is.gd/create.php?format=simple&url=${enc}" 2>&1)"
-            echo "[shortcode] is.gd auto: ${resp2}"
-            case "$resp2" in https://is.gd/*) SHORT="$resp2" ;; esac
+            final="$(curl -sSL -o /dev/null -w '%{url_effective}' --max-time 8 "https://da.gd/${ALIAS}" 2>/dev/null)"
+            echo "[shortcode] existing da.gd/${ALIAS} -> ${final}"
+            case "$final" in *"${APEX_HOST}"*) SHORT="https://da.gd/${ALIAS}"; echo "[shortcode] reusing (points at our apex)";; esac
           fi
-          [ -z "$SHORT" ] && echo "::notice title=Short link::is.gd unavailable — the apex URL + QR still work."
-          qrenc="$(jq -rn --arg u "$APEX" '$u|@uri' 2>/dev/null)"
+          if [ -z "$SHORT" ]; then r="$(curl -sS --max-time 8 "https://da.gd/s?url=${enc}" 2>&1 | head -1)"; echo "[shortcode] da.gd auto: ${r}"; SHORT="$(ok_short "$r")"; fi
+          if [ -z "$SHORT" ]; then r="$(curl -sS --max-time 8 "https://tinyurl.com/api-create.php?url=${enc}" 2>&1)"; echo "[shortcode] tinyurl auto: ${r}"; SHORT="$(ok_short "$r")"; fi
+          [ -z "$SHORT" ] && echo "::notice title=Short link::No shortener available — the apex URL + QR still work."
           {
-            echo "## QuestVisionStream WebXR (STAGING — questvisionstream-test) — safe to test"
+            echo "## QuestVisionStream WebXR — STAGING (questvisionstream-test)"
             echo ""
             echo "> This PR deployed to the **isolated** \`questvisionstream-test\` project. The"
             echo "> live site \`questvisionstream.pages.dev\` was **not** touched."
             echo ""
-            echo "| | |"
-            echo "| --- | --- |"
-            echo "| **Open** | [\`$(disp "$APEX")\`](${APEX}) |"
-            [ -n "$SHORT" ] && echo "| **Short link** | [\`$(disp "$SHORT")\`](${SHORT}) |"
-            [ -n "${DEPLOY_URL}" ] && echo "| **This build** | [\`${DEPLOY_URL}\`](${DEPLOY_URL}) |"
-            echo "| **Signaling server** | set \`QVS_SIGNALING_URL\` on the \`questvisionstream-test\` project (Settings → Variables) or append \`?server=wss://HOST:3000\` |"
+            echo "Signaling: KV \`QVS_CONFIG\`/\`signaling_url\` on \`questvisionstream-test\`, else \`QVS_SIGNALING_URL\`; per-open override \`?server=wss://HOST:3000\`."
             echo ""
-            echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${qrenc})"
+            echo "![QR code](https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&data=${enc})"
+            echo ""
+            echo "---"
+            echo ""
+            echo "# 🧪 Open on your Quest (staging)"
+            echo ""
+            if [ -n "$SHORT" ]; then
+              echo "# [\`$(disp "$SHORT")\`](${SHORT})"
+              echo ""
+              echo "### …or the full URL"
+              echo ""
+              echo "# [\`$(disp "$APEX")\`](${APEX})"
+            else
+              echo "# [\`$(disp "$APEX")\`](${APEX})"
+            fi
+            [ -n "${DEPLOY_URL}" ] && { echo ""; echo "<sub>This exact build: [$(disp "${DEPLOY_URL}")](${DEPLOY_URL})</sub>"; }
           } >> "$GITHUB_STEP_SUMMARY"

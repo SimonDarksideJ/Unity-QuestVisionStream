@@ -15,6 +15,7 @@ The single hub for all V2 documentation. Everything below lives here under
 |-------|----------------|
 | [Configuration-and-Connectivity.md](Configuration-and-Connectivity.md) | How the client is configured (which server it dials), the WebRTC connection sequence, ports, STUN/TURN, and a connectivity troubleshooting matrix. |
 | [Install-Mac-M2.md](Install-Mac-M2.md) | Run the server natively on a Mac mini M2 (macOS 26.5) using the GPU + full unified memory (MPS), and expose it externally (Tailscale / Cloudflare Tunnel / Caddy / router + TURN). |
+| [Quest-Headset-Setup.md](Quest-Headset-Setup.md) | Set up the **Meta Quest**: sideload the Tailscale APK (not in the Horizon Store), join the same tailnet, open the hosted client, and troubleshoot the on-headset status/connection. |
 | [Deploy-HuggingFace-Spaces.md](Deploy-HuggingFace-Spaces.md) | Run the server on Hugging Face Spaces (free cloud GPU). |
 | [Deployment-Cloudflare-Pages.md](Deployment-Cloudflare-Pages.md) | Deploy the WebXR client to Cloudflare Pages (isolated prod + staging) via GitHub Actions; create the `CLOUDFLARE_*` secrets; configure the server URL (KV binding / env var / `?server=`). |
 

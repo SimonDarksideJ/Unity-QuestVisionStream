@@ -202,8 +202,9 @@ sudo tailscale up
 tailscale ip -4               # e.g. 100.101.102.103  (stable across networks)
 ```
 
-On the Quest, install Tailscale from the Horizon Store, sign into the **same**
-tailnet, then open:
+On the Quest, install Tailscale by **sideloading its Android APK** — it is **not**
+in the Meta Horizon Store (see [Quest-Headset-Setup.md](Quest-Headset-Setup.md)
+for the full steps). Sign into the **same** tailnet, then open:
 
 ```
 https://<client-host>/?server=ws://100.101.102.103:3000
