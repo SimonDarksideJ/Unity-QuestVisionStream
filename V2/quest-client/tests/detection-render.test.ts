@@ -108,6 +108,54 @@ describe('capture-pose placement (C3)', () => {
   });
 });
 
+class FakeXrEmitter {
+  private readonly listeners = new Map<string, Set<() => void>>();
+  addEventListener(event: string, handler: () => void): void {
+    const set = this.listeners.get(event) ?? new Set<() => void>();
+    set.add(handler);
+    this.listeners.set(event, set);
+  }
+  removeEventListener(event: string, handler: () => void): void {
+    this.listeners.get(event)?.delete(handler);
+  }
+  dispatch(event: string): void {
+    for (const handler of this.listeners.get(event) ?? []) handler();
+  }
+}
+
+describe('recenter cleanup', () => {
+  it('clears all tags when the XR reference space resets (user recentered)', () => {
+    const camera = makeCamera();
+    const detection = new FakeDetectionService();
+    installServiceManager(new Map<unknown, unknown>([[IDetectionService, detection]]));
+
+    const xr = new FakeXrEmitter() as FakeXrEmitter & {
+      getReferenceSpace: () => FakeXrEmitter;
+    };
+    const referenceSpace = new FakeXrEmitter();
+    xr.getReferenceSpace = () => referenceSpace;
+
+    const scene = new THREE.Scene();
+    const SystemCtor = DetectionRenderSystem as unknown as new () => object;
+    const system = new SystemCtor() as { world: unknown; scene: THREE.Scene; init(): void };
+    system.world = { camera, renderer: { xr } };
+    system.scene = scene;
+    system.init();
+
+    detection.emit('detections', payload('cup'));
+    expect(scene.children).toHaveLength(1);
+
+    // Session starts, then the user recenters: every world-anchored tag is
+    // now misplaced relative to the new reference space — clear them.
+    xr.dispatch('sessionstart');
+    referenceSpace.dispatch('reset');
+
+    expect(scene.children).toHaveLength(0);
+    detection.emit('detections', payload('cup')); // dedup must be reset too
+    expect(scene.children).toHaveLength(1);
+  });
+});
+
 describe('tag lifecycle baselines', () => {
   it('per-class dedup places one tag per label', () => {
     const camera = makeCamera();

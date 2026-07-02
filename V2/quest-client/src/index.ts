@@ -15,6 +15,7 @@ import { resolveSignalingUrl } from './config';
 import { setServiceManager } from './runtime';
 import { CameraStreamSystem } from './systems/CameraStreamSystem';
 import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
+import { StatusSpriteSystem } from './systems/StatusSpriteSystem';
 import { bindStatusDom, status, wireStatusServices } from './ui/status';
 
 /**
@@ -84,7 +85,8 @@ async function bootstrap(): Promise<void> {
   world
     .registerSystem(bridgeSystem as never)
     .registerSystem(CameraStreamSystem)
-    .registerSystem(DetectionRenderSystem);
+    .registerSystem(DetectionRenderSystem)
+    .registerSystem(StatusSpriteSystem); // in-AR headline HUD (head-locked)
 
   console.info('[QuestClient] Ready. Streaming to', signalingUrl);
 }

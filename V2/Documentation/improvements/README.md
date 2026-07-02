@@ -83,6 +83,10 @@ Every improvement pass follows the same three-step loop:
   isn't in the verified reference (e.g. IWSDK reference-space reset), ship
   the tested, callable seam (`clear()`) and record the one-line wiring as a
   known follow-up instead of guessing.
+- **A deferral names its unblocker — and the unblocker may already be on
+  disk.** The completion pass closed two API-gated deferrals in one sitting
+  because the authoritative answer was in the installed package's `.d.ts`
+  files all along; check `node_modules` typings before trusting a docs gap.
 
 ## How to add an entry
 
@@ -100,3 +104,4 @@ Every improvement pass follows the same three-step loop:
 | [2026-07 — Server hardening](2026-07-Server-Hardening.md) | `QuestVisionStreamServer` (Python) | Event-loop stall 316ms → 8.4ms; live-edge lag 1631ms (unbounded) → 60ms (bounded); 6 robustness/security gaps closed; first test suite (18 tests) |
 | [2026-07 — Library hardening](2026-07-Library-Hardening.md) | `com.questvisionstream` (TypeScript) | Offer-drop connect race fixed; early ICE candidates 3/3 lost → 3/3 applied; mid-session drop permanent → auto re-offer; 2 unhandled-rejection paths → 0; strict payload validation; first test suite (36 tests) |
 | [2026-07 — Client hardening](2026-07-Client-Hardening.md) | `quest-client` (IWSDK app) | Camera-error silent stall fixed; status surface (failures were console-only); capture-pose placement (0.75 m arrival-pose error → <1 µm of the capture ray); `?server=` validated; config fetch timeout; texture leak closed; first test suite (30 tests) |
+| [2026-07 — Review completion](2026-07-Review-Completion.md) | `quest-client` + deploy pipeline | Deferred items closed after source-verifying IWSDK APIs: in-AR status HUD (head-locked), recenter tag cleanup, pts-based dynamic latency estimation, `?server=` user confirmation, `/api/config` deploy smoke check; client suite 30 → 49 tests |

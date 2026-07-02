@@ -10,6 +10,7 @@ import {
 } from '@questvisionstream/client';
 import { AppConfig } from '../config';
 import { getServiceManager } from '../runtime';
+import { LatencyEstimator } from '../rendering/LatencyEstimator';
 import { PoseHistory, unprojectThroughSnapshot } from '../rendering/PoseHistory';
 import { createTagObject, disposeTagObject } from '../rendering/TagFactory';
 
@@ -32,12 +33,37 @@ export class DetectionRenderSystem
   private readonly deduper = new DetectionDeduper({ policy: AppConfig.dedupPolicy });
   private readonly tags: THREE.Object3D[] = [];
   private readonly poseHistory = new PoseHistory();
+  private readonly latency = new LatencyEstimator(AppConfig.assumedLatencyMs);
   private unsub: (() => void) | undefined;
 
   override init(): void {
     const detection = getServiceManager().resolve(IDetectionService);
     this.unsub = detection.on('detections', (payload) => {
+      this.latency.observe(performance.now(), payload.pts);
       this.renderDetections(toRenderBatch(payload, { invertY: AppConfig.invertY }));
+    });
+    this.watchReferenceSpaceReset();
+  }
+
+  /**
+   * A recenter moves the reference space out from under every world-anchored
+   * tag — clear them (they'd all be misplaced). `world.renderer` and
+   * `world.session` are verified members of the installed @iwsdk/core 0.4.2;
+   * the `reset` event is the standard WebXR reference-space API.
+   */
+  private watchReferenceSpaceReset(): void {
+    const xr = (
+      this.world as unknown as {
+        renderer?: { xr?: THREE.WebXRManager };
+      }
+    )?.renderer?.xr;
+    if (!xr?.addEventListener) return;
+    xr.addEventListener('sessionstart', () => {
+      const referenceSpace = xr.getReferenceSpace?.();
+      referenceSpace?.addEventListener?.('reset', () => {
+        this.clear();
+        this.poseHistory.clear();
+      });
     });
   }
 
@@ -79,7 +105,7 @@ export class DetectionRenderSystem
    * recorded capture-time pose when available, else the live camera.
    */
   private placeOnRay(center: NormalizedPoint): THREE.Vector3 | null {
-    const snapshot = this.poseHistory.lookup(performance.now() - AppConfig.assumedLatencyMs);
+    const snapshot = this.poseHistory.lookup(performance.now() - this.latency.latencyMs());
     if (snapshot) {
       return unprojectThroughSnapshot(snapshot, center, AppConfig.placementDistanceMeters);
     }

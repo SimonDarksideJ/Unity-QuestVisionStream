@@ -127,8 +127,12 @@ Cloudflare GPU) are correctly reasoned.
 > surface were fixed test-first in the client hardening pass — see
 > [improvements/2026-07-Client-Hardening.md](improvements/2026-07-Client-Hardening.md).
 > C2's recovery logic landed in the library pass; the host now surfaces
-> failures instead of swallowing them. Kept as written for the historical
-> record.
+> failures instead of swallowing them. The deferred follow-ups (in-AR HUD,
+> recenter cleanup, pts-based latency estimation, `?server=` confirmation,
+> deploy smoke check) were closed in
+> [improvements/2026-07-Review-Completion.md](improvements/2026-07-Review-Completion.md),
+> which also records the final disposition of every remaining item. Kept as
+> written for the historical record.
 
 | # | Severity | Location | Issue |
 |---|----------|----------|-------|

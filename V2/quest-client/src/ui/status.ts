@@ -61,6 +61,28 @@ export class StatusModel {
     return () => this.listeners.delete(listener);
   }
 
+  /**
+   * The single most important thing to show the user right now, or null when
+   * everything is healthy. Priority: camera failure → connection problem →
+   * signaling drop → quality gate → connection progress.
+   */
+  headline(): string | null {
+    const camera = this.fields.get('camera');
+    if (camera?.includes('error')) return `camera: ${camera}`;
+    const connection = this.fields.get('connection');
+    if (connection && (connection.includes('failed') || connection.includes('disconnected'))) {
+      return `connection: ${connection}`;
+    }
+    const signaling = this.fields.get('signaling');
+    if (signaling?.includes('disconnected')) return `signaling: ${signaling}`;
+    const quality = this.fields.get('quality');
+    if (quality?.includes('paused')) return `quality: ${quality}`;
+    if (connection && connection !== 'ready' && connection !== 'connected') {
+      return `connection: ${connection}`;
+    }
+    return null;
+  }
+
   reset(): void {
     this.fields.clear();
     for (const listener of this.listeners) listener();

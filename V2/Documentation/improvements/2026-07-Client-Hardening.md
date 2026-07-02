@@ -168,17 +168,19 @@ users straight into the silent mixed-content failure the docs warn about.
 
 ## What was deliberately NOT changed
 
-- **Recenter cleanup** (clearing tags on the WebXR reference-space `reset`
-  event): the IWSDK API for reaching the session/reference space is not in
-  the verified API snapshot (`IWSDK-API-Reference.md` flags exactly this
-  area). Wiring it against a guessed API would be worse than deferring;
-  `clear()` is public and tested, so the wiring is one line once the API is
-  confirmed on-device.
-- **In-AR world-space status HUD** — see §2; the model is ready for it.
-- **`?server=` user confirmation dialog** — see §4.
+> **Status update:** the first three deferrals below were completed in the
+> follow-up pass after the IWSDK APIs were source-verified from the installed
+> package — see [2026-07-Review-Completion.md](2026-07-Review-Completion.md).
+
+- ~~**Recenter cleanup**~~ *Done in the completion pass* — `world.renderer.xr`
+  → reference-space `reset` was verified in the installed 0.4.2 typings and
+  wired to `clear()` + pose-history reset, with tests.
+- ~~**In-AR world-space status HUD**~~ *Done in the completion pass* —
+  `StatusSpriteSystem`, head-locked via the verified `playerHeadEntity`.
+- ~~**`?server=` user confirmation dialog**~~ *Done in the completion pass.*
 - **Surface anchoring via hit-test/depth** (the other P0) — orthogonal to
   this pass; the renderer seam and now the pose history are the foundations
-  it will build on.
+  it will build on. Requires on-headset iteration.
 - **Tag update/expiry policy** (`per-class` still pins the first instance
   forever) — a product decision, not a defect; `spatial-per-class` is one
   config value away.

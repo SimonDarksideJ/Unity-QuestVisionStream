@@ -111,9 +111,36 @@ per-detection viewport points we unproject through `world.camera` — see
 `DetectionRenderSystem`.) Scene understanding: `XRPlane`, `XRMesh`
 (`semanticLabel`, `dimensions`), `XRAnchor` via `SceneUnderstandingSystem`.
 
+## World members (source-verified from installed 0.4.2 typings, 2026-07)
+
+Confirmed directly from `node_modules/@iwsdk/core/dist/ecs/world.d.ts`:
+
+```ts
+class World extends ElicsWorld {
+  scene: Scene;                      // THREE.Scene
+  camera: PerspectiveCamera;         // THREE camera
+  renderer: WebGLRenderer;           // → renderer.xr (WebXRManager): sessionstart
+                                     //   event + getReferenceSpace() → 'reset'
+                                     //   event on recenter (standard WebXR)
+  session: XRSession | undefined;    // live XR session
+  visibilityState: Signal<VisibilityState>;
+  player: XROrigin;
+  playerEntity: Entity;              // persistent, survives level changes
+  playerHeadEntity: Entity;          // persistent head Group — ideal parent for
+                                     //   head-locked HUD content (entity.object3D)
+  playerSpaceEntities: { head, raySpaces{l,r}, gripSpaces{l,r}, indexTipSpaces{l,r} };
+  launchXR(xrOptions?); exitXR();
+  createEntity(); createTransformEntity(object?, opts?);
+}
+```
+
+The client uses `renderer.xr` ('sessionstart' → reference-space `reset` →
+clear misplaced tags) and `playerHeadEntity.object3D` (in-AR status HUD).
+
 ## ⚠️ Not fully verified
 Exhaustive `WorldOptions` type (API page 404); `camera` object sub-config (docs
 only show `camera: true`); no `systems` option on `World.create` (register on the
 instance); `CameraUtils` exact signatures from docs not source; `SessionMode`
 beyond `ImmersiveVR`/`ImmersiveAR`. Validate against `npm create @iwsdk@latest`
-output when the toolchain is available.
+output when the toolchain is available. (The World members above are now
+source-verified — see the section preceding this one.)

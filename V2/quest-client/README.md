@@ -85,11 +85,18 @@ panel.
   True surface anchoring (raycast the ray against IWSDK scene-understanding
   `XRMesh` / environment depth, mirroring Unity's `EnvironmentRaycast`) is the
   next enhancement — the seam and math are already in place.
-- **Capture-pose latency is an assumed constant** (`assumedLatencyMs`, default
-  200 ms); the server's `pts` wire field enables per-session estimation later.
-- The DOM status panel is visible on the 2D page (pre-AR) and in desktop
-  debugging; a world-space in-AR rendering of the same `StatusModel` is a
-  follow-up that needs on-headset validation.
+- **Capture-pose latency = configured base + measured queuing delay**: the
+  `LatencyEstimator` tracks the server's `pts` timestamps, so inference/network
+  queuing spikes shift the pose lookup dynamically. Only the base
+  (`assumedLatencyMs`, default 200 ms) remains a per-deployment constant.
+- **Status is shown in-AR too**: `StatusSpriteSystem` renders the
+  `StatusModel` headline as a head-locked sprite (hidden when healthy);
+  legibility/placement tuning on a real headset is pending. The DOM panel
+  covers the 2D page and desktop debugging.
+- **Recenter-safe**: a WebXR reference-space `reset` clears all tags, the
+  pose history, and dedup (everything anchored in the old space is invalid).
+- **`?server=` overrides ask for consent** for non-localhost targets before
+  the camera stream is pointed anywhere.
 - The app enables `features.camera` and `features.environmentRaycast`; scene
   understanding can be added for mesh-accurate anchoring.
 - Tests + hardening history: see

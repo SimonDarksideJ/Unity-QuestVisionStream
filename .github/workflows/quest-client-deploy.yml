@@ -153,6 +153,10 @@ jobs:
       - name: Deploy to Cloudflare Pages (production)
         id: deploy
         if: env.CLOUDFLARE_API_TOKEN != ''
+        # NOTE: the /api/config Pages Function is NOT part of the dist artifact —
+        # wrangler discovers `functions/` relative to workingDirectory (from this
+        # job's checkout). Keep workingDirectory pointing at V2/quest-client or
+        # the Function silently disappears and the app falls back to localhost.
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -277,6 +281,9 @@ jobs:
       - name: Deploy to Cloudflare Pages (staging)
         id: deploy
         if: env.CLOUDFLARE_API_TOKEN != ''
+        # NOTE: `functions/api/config.js` deploys implicitly from this checkout's
+        # workingDirectory, not from the dist artifact — see the production job's
+        # note. The smoke check below verifies it actually made it.
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -316,6 +323,14 @@ jobs:
           else
             echo "::warning title=Staging smoke check::index=${page} (expected 200). Likely first-deploy TLS/propagation lag — the deploy itself succeeded; re-run or check ${DEPLOY_URL} directly."
           fi
+          # The Pages Function rides along implicitly (see the deploy step note) —
+          # verify /api/config actually deployed and returns its JSON shape.
+          config_body="$(curl -s --max-time 20 "${DEPLOY_URL}/api/config" || echo "")"
+          echo "  /api/config -> ${config_body}"
+          case "$config_body" in
+            *'"server"'*) echo "✅ /api/config Function deployed" ;;
+            *) echo "::warning title=Staging smoke check::/api/config did not return the expected JSON — the Pages Function may not have deployed (check workingDirectory/functions/)." ;;
+          esac
 
       - name: Publish staging short code + QR
         if: steps.deploy.outcome == 'success'

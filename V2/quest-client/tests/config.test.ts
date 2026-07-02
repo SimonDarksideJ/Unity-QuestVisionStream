@@ -74,6 +74,53 @@ describe('?server= validation', () => {
   });
 });
 
+describe('?server= confirmation (camera-redirect guard)', () => {
+  it('asks the user before streaming to a non-localhost override target', async () => {
+    setPageUrl('/?server=wss://someone-elses-server.example:3000');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"server":""}')));
+    const confirm = vi.fn((_message?: string) => true);
+    vi.stubGlobal('confirm', confirm);
+
+    expect(await resolveSignalingUrl()).toBe('wss://someone-elses-server.example:3000');
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0]?.[0])).toContain('someone-elses-server.example');
+  });
+
+  it('falls through to the configured server when the user declines', async () => {
+    setPageUrl('/?server=wss://attacker.example:3000');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ server: 'wss://trusted.example' }))),
+    );
+    vi.stubGlobal('confirm', vi.fn(() => false));
+
+    expect(await resolveSignalingUrl()).toBe('wss://trusted.example');
+  });
+
+  it('does not prompt for localhost dev targets', async () => {
+    setPageUrl('/?server=ws://localhost:3000');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"server":""}')));
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirm);
+
+    expect(await resolveSignalingUrl()).toBe('ws://localhost:3000');
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('does not prompt for the /api/config-configured server (trusted tier)', async () => {
+    setPageUrl('/');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ server: 'wss://from-kv.example' }))),
+    );
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirm);
+
+    expect(await resolveSignalingUrl()).toBe('wss://from-kv.example');
+    expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
 describe('config fetch timeout', () => {
   it('does not hang boot when /api/config never responds', async () => {
     setPageUrl('/');

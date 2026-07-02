@@ -49,9 +49,26 @@ export function isValidSignalingUrl(value: string): boolean {
   }
 }
 
+/**
+ * A `?server=` override redirects the camera stream — since the whole UX is
+ * "scan a QR", a crafted link could silently point the passthrough feed at an
+ * attacker's server. Ask the user for non-localhost override targets; the
+ * KV/env-configured tiers are deployment-trusted and never prompt.
+ */
+function confirmOverrideTarget(candidate: string): boolean {
+  if (typeof confirm !== 'function') return true; // non-interactive context
+  const host = new URL(candidate).hostname;
+  if (host === 'localhost' || host === '127.0.0.1') return true; // dev flow
+  return confirm(`Stream the headset camera to "${host}"?\n\n(${candidate})`);
+}
+
 function acceptSignalingUrl(candidate: string, source: string): string | null {
   if (!isValidSignalingUrl(candidate)) {
     console.warn(`[QuestClient] Ignoring invalid signaling URL from ${source}:`, candidate);
+    return null;
+  }
+  if (source === '?server=' && !confirmOverrideTarget(candidate)) {
+    console.warn('[QuestClient] ?server= override declined by the user; ignoring it.');
     return null;
   }
   if (

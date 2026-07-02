@@ -61,7 +61,8 @@ export function setTagLabel(tag: THREE.Object3D, label: string): void {
   next.material.dispose();
 }
 
-function createTextSprite(text: string): THREE.Sprite {
+/** Billboarded canvas-text sprite (also used by the in-AR status HUD). */
+export function createTextSprite(text: string): THREE.Sprite {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
   const fontSize = 48;
