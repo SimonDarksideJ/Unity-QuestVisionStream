@@ -112,8 +112,8 @@ jobs:
       - name: Run test suite (vitest)
         run: npm test
 
-  client-typecheck:
-    name: Client typecheck (quest-client, bundles the library)
+  client-tests:
+    name: Client tests + typecheck (quest-client, bundles the library)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -131,5 +131,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check (client + aliased library source)
+      - name: Type check (client + tests + aliased library source)
         run: npm run typecheck
+
+      - name: Run test suite (vitest)
+        run: npm test

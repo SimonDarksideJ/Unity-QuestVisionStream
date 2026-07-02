@@ -17,5 +17,5 @@
       "@questvisionstream/client": ["../com.questvisionstream/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vite.config.ts", "vitest.config.ts"]
 }

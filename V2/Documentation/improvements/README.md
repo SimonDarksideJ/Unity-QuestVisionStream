@@ -36,6 +36,11 @@ Every improvement pass follows the same three-step loop:
 - **Make performance tests print their measurement.** An assertion threshold
   says pass/fail; the printed `[STATS]` line is what goes in the entry and what
   lets you spot gradual regressions before they cross the threshold.
+- **Wall-clock thresholds are load-sensitive.** The server's loop-stall
+  assertion tripped once when a Vite build ran concurrently on the same
+  machine (suite time 2.5s → 11.7s). Run perf-threshold suites without
+  competing load — CI does this naturally via separate jobs; locally, don't
+  parallelize them with builds.
 - **Watch for defects masking each other.** The event-loop-blocking bug hid
   the backpressure bug: with the loop blocked, the test's frame *producer*
   starved too, so queue lag looked tiny. Only after fixing the first defect
@@ -66,6 +71,18 @@ Every improvement pass follows the same three-step loop:
   been patched in the quest-client, but every future host would inherit the
   gap; the re-offer state machine belongs in the library next to the state it
   reasons about.
+- **Mock the framework, test the system.** For ECS hosts, mock the engine's
+  base class (`createSystem`) at the module seam and run the system's real
+  logic against real math objects (three.js cameras/scenes) — the client
+  pass's placement test caught a 0.75 m error in actual matrix math.
+- **Assert against the instance the code under test holds.** A fixture that
+  fabricates a fresh object per call (e.g. `getVideoTracks()` returning a new
+  track each time) makes the test observe a different object than the code
+  mutates — fixture identity bugs masquerade as product bugs.
+- **Defer wiring against unverified APIs.** If the platform API a fix needs
+  isn't in the verified reference (e.g. IWSDK reference-space reset), ship
+  the tested, callable seam (`clear()`) and record the one-line wiring as a
+  known follow-up instead of guessing.
 
 ## How to add an entry
 
@@ -82,3 +99,4 @@ Every improvement pass follows the same three-step loop:
 |-------|-------|------------------|
 | [2026-07 — Server hardening](2026-07-Server-Hardening.md) | `QuestVisionStreamServer` (Python) | Event-loop stall 316ms → 8.4ms; live-edge lag 1631ms (unbounded) → 60ms (bounded); 6 robustness/security gaps closed; first test suite (18 tests) |
 | [2026-07 — Library hardening](2026-07-Library-Hardening.md) | `com.questvisionstream` (TypeScript) | Offer-drop connect race fixed; early ICE candidates 3/3 lost → 3/3 applied; mid-session drop permanent → auto re-offer; 2 unhandled-rejection paths → 0; strict payload validation; first test suite (36 tests) |
+| [2026-07 — Client hardening](2026-07-Client-Hardening.md) | `quest-client` (IWSDK app) | Camera-error silent stall fixed; status surface (failures were console-only); capture-pose placement (0.75 m arrival-pose error → <1 µm of the capture ray); `?server=` validated; config fetch timeout; texture leak closed; first test suite (30 tests) |

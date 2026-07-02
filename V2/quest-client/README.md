@@ -34,15 +34,22 @@ import a concrete service class.
 
 ## Key behaviours recreated from the Unity reference
 
-- **World placement** (`DetectionRenderSystem`): the normalized viewport center
-  of each box is unprojected through the XR camera and a tag is placed along the
-  ray — the analogue of Unity's `DetectionSpawnerManager` +
-  `ScreenPointToRayInWorld`. Per-class dedup via the library's `DetectionDeduper`.
+- **World placement with capture-time pose** (`DetectionRenderSystem` +
+  `PoseHistory`): the normalized viewport center of each box is unprojected
+  through the camera pose from **~capture time** (arrival −
+  `AppConfig.assumedLatencyMs`), not the pose when the reply arrives — the
+  analogue of Unity's `DetectionSpawnerManager` + `CapturePosition()`
+  pose-freeze. Per-class dedup via the library's `DetectionDeduper`.
 - **Billboarded label tags** (`TagFactory`): a marker + canvas-text sprite, the
-  analogue of the Unity `DetectionTag` prefab.
+  analogue of the Unity `DetectionTag` prefab (full GPU disposal incl. label
+  textures via `disposeTagObject`).
 - **Edge quality gate** (`CameraStreamSystem`): toggles the outbound video
   track's `enabled` from the brightness qualifier — frames too dark/over-exposed
   aren't streamed. Recreates the intent of the Unity `BrightnessEstimation` sample.
+- **Status surface** (`src/ui/status.ts`): camera state, signaling, WebRTC
+  connection, quality gate, and detection throughput are shown on the page's
+  status panel (fed by the library's events) — failures are never console-only.
+  Camera permission errors are detected (`CameraState.Error`) and reported.
 
 ## Prerequisites
 
@@ -59,10 +66,14 @@ npm run dev          # Vite dev server on :5173 (host: all interfaces)
 # open with the server target:  http://<dev-host>:5173/?server=ws://<server>:3000
 npm run build        # tsc --noEmit + production bundle to dist/
 npm run typecheck
+npm test             # vitest — @iwsdk/core mocked at the module seam
 ```
 
-Configure the signaling target via `?server=ws://HOST:3000`, or
-`VITE_SIGNALING_URL` at build time (see `src/config.ts`).
+Configure the signaling target via `?server=` (must be a `ws://`/`wss://` URL —
+anything else is rejected; hosted HTTPS pages need `wss://`), the `/api/config`
+Pages Function (KV/env, with a 4 s fetch timeout), or `VITE_SIGNALING_URL` at
+build time (see `src/config.ts`). The resolved target is shown on the status
+panel.
 
 ## Notes / limitations
 
@@ -74,5 +85,13 @@ Configure the signaling target via `?server=ws://HOST:3000`, or
   True surface anchoring (raycast the ray against IWSDK scene-understanding
   `XRMesh` / environment depth, mirroring Unity's `EnvironmentRaycast`) is the
   next enhancement — the seam and math are already in place.
+- **Capture-pose latency is an assumed constant** (`assumedLatencyMs`, default
+  200 ms); the server's `pts` wire field enables per-session estimation later.
+- The DOM status panel is visible on the 2D page (pre-AR) and in desktop
+  debugging; a world-space in-AR rendering of the same `StatusModel` is a
+  follow-up that needs on-headset validation.
 - The app enables `features.camera` and `features.environmentRaycast`; scene
   understanding can be added for mesh-accurate anchoring.
+- Tests + hardening history: see
+  [`../Documentation/improvements/2026-07-Client-Hardening.md`](../Documentation/improvements/2026-07-Client-Hardening.md).
+  CI runs the suite on every PR/push touching `V2/` (`.github/workflows/v2-tests.yml`).

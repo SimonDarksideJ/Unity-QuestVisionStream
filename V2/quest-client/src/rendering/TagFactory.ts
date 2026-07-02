@@ -28,6 +28,27 @@ export function createTagObject(label: string): THREE.Object3D {
   return group;
 }
 
+/**
+ * Dispose everything a tag owns on the GPU: geometries, materials, and —
+ * crucially — material texture maps. `Material.dispose()` does NOT dispose
+ * its `.map`, so without this every torn-down tag leaked one `CanvasTexture`.
+ */
+export function disposeTagObject(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh & { material?: THREE.Material | THREE.Material[] };
+    mesh.geometry?.dispose?.();
+    const materials = Array.isArray(mesh.material)
+      ? mesh.material
+      : mesh.material
+        ? [mesh.material]
+        : [];
+    for (const material of materials) {
+      (material as THREE.Material & { map?: THREE.Texture | null }).map?.dispose();
+      material.dispose();
+    }
+  });
+}
+
 /** Update the text of a tag created by {@link createTagObject}. */
 export function setTagLabel(tag: THREE.Object3D, label: string): void {
   const sprite = tag.children.find((c) => c instanceof THREE.Sprite) as THREE.Sprite | undefined;

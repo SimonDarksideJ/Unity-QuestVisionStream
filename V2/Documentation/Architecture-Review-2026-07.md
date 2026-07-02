@@ -122,6 +122,14 @@ Cloudflare GPU) are correctly reasoned.
 
 ### Quest client
 
+> **Status update (2026-07):** C1, C3 (capture-pose approximation), C4, C5,
+> the config-fetch timeout, `?server=` validation, and the missing status
+> surface were fixed test-first in the client hardening pass — see
+> [improvements/2026-07-Client-Hardening.md](improvements/2026-07-Client-Hardening.md).
+> C2's recovery logic landed in the library pass; the host now surfaces
+> failures instead of swallowing them. Kept as written for the historical
+> record.
+
 | # | Severity | Location | Issue |
 |---|----------|----------|-------|
 | C1 | **High** | `CameraStreamSystem.ts:49-52` | **`CameraState.Error` is never handled.** Permission denied / capture failure → the system polls forever, no retry, no user feedback. Silent permanent stall on the most common first-run failure. |
