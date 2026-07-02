@@ -1,0 +1,7 @@
+# Florence-2 captioning detector. Prefers CUDA (underperforms on MPS).
+torch==2.4.1
+torchvision==0.19.1
+transformers==4.44.2
+timm==1.0.9
+einops==0.8.0
+pillow==10.4.0

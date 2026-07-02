@@ -1,5 +1,13 @@
 # Modernization Handover Notes
 
+> **⚠️ CORRECTION (2026-07-01, verified against git):** The "What's been done"
+> section below describes code (server rewrite, `web/` WebXR client) that lived on
+> a different branch (`claude/yolo-streaming-modernize-vaxefd`). **That work is not
+> present on this branch or in any reachable git ref** — this tree is the original
+> upstream code plus only `HANDOVER.md` + `mcp.json`. Every "fixed" bug below is
+> still live. Read this document as *research/decisions*, not completed work.
+> See `EVALUATION.md` for the verified current-state assessment.
+
 Working context for the QuestVisionStream modernization effort, so a fresh
 session can resume without re-investigating. Written 2026-07-01.
 

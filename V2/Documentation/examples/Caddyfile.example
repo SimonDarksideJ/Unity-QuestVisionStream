@@ -1,0 +1,18 @@
+# Optional reverse proxy for remote/online access to the signaling WebSocket.
+# For on-LAN headset use you do NOT need this — connect the client straight to
+# ws://<mac-ip>:3000. Use this only to expose signaling over WSS to the internet.
+#
+# Caddy auto-provisions TLS for a real domain. WebRTC *media* still needs a TURN
+# server to cross NATs (set QVS_ENABLE_TURN=true + QVS_TURN_* on the server);
+# this proxy only carries signaling + the health endpoint.
+
+qvs.example.com {
+    # Signaling WebSocket → aiortc server
+    reverse_proxy /ws* 127.0.0.1:3000
+    reverse_proxy 127.0.0.1:3000
+
+    # Health endpoint
+    handle_path /health* {
+        reverse_proxy 127.0.0.1:8080
+    }
+}

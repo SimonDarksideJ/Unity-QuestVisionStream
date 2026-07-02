@@ -1,0 +1,4 @@
+# Open-vocabulary zero-shot detectors: OWLv2 and Grounding DINO.
+torch==2.4.1
+transformers==4.44.2
+pillow==10.4.0

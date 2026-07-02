@@ -1,0 +1,148 @@
+# QuestVisionStream V2 — test & typecheck gate.
+#
+# Scope: the V2/ tree only. Three independent jobs:
+#   - server-tests       → pytest suite for the Python inference server
+#                          (V2/QuestVisionStreamServer/tests — no model weights
+#                          or GPU needed; see Documentation/improvements/ for
+#                          the method + tracked stats)
+#   - library-typecheck  → tsc gate for the reusable streaming library
+#                          (V2/com.questvisionstream)
+#   - client-typecheck   → tsc gate for the IWSDK client. The client bundles
+#                          the library FROM SOURCE via Vite/tsconfig aliases,
+#                          so this also catches library changes that break the
+#                          client — which quest-client-deploy.yml misses when
+#                          only V2/com.questvisionstream changes.
+#
+# Deploys stay in quest-client-deploy.yml; this workflow never touches
+# Cloudflare and needs no secrets, so it runs identically on fork PRs.
+#
+# HOME BRANCH: IWSDK (same as quest-client-deploy.yml — change together).
+
+name: QuestVisionStream V2 Tests
+
+on:
+  pull_request:
+    branches: [IWSDK]
+    paths:
+      - "V2/**"
+      - "!V2/**/*.md"
+      - "!V2/Documentation/**"
+      - ".github/workflows/v2-tests.yml"
+  push:
+    branches: [IWSDK]
+    paths:
+      - "V2/**"
+      - "!V2/**/*.md"
+      - "!V2/Documentation/**"
+      - ".github/workflows/v2-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-tests:
+    name: Server tests (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: V2/QuestVisionStreamServer
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          # Matches the runtime target (Dockerfile python:3.11-slim).
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            V2/QuestVisionStreamServer/requirements.txt
+            V2/QuestVisionStreamServer/requirements-dev.txt
+
+      - name: Install dependencies (base + dev only — no detector extras)
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run test suite
+        # pipefail so a pytest failure isn't masked by tee's exit code.
+        run: |
+          set -o pipefail
+          python -m pytest tests/ -c tests/pytest.ini --rootdir=. | tee pytest-output.txt
+
+      - name: Publish measured stats to the job summary
+        # The performance tests print [STATS] lines (event-loop stall,
+        # live-edge lag). Surfacing them per-run makes gradual regressions
+        # visible before they cross an assertion threshold.
+        if: always()
+        run: |
+          {
+            echo "## Server test stats"
+            echo ""
+            echo '```'
+            grep -E "\[STATS\]|passed|failed" pytest-output.txt || echo "no stats captured"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  library-tests:
+    name: Library tests + typecheck (com.questvisionstream)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: V2/com.questvisionstream
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: V2/com.questvisionstream/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check (src + tests)
+        run: npm run typecheck
+
+      - name: Run test suite (vitest)
+        run: npm test
+
+  client-tests:
+    name: Client tests + typecheck (quest-client, bundles the library)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: V2/quest-client
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: V2/quest-client/package-lock.json
+
+      - name: Install library dependencies (file-linked)
+        # `npm ci` in quest-client symlinks the file: library but does NOT
+        # install the library's own node_modules — its
+        # @realitycollective/service-framework import is unresolvable from the
+        # symlink's real path, and the client type-checks the library FROM
+        # SOURCE via the Vite/tsconfig alias. Install the library first (same
+        # order as the V2 monorepo's install:all).
+        working-directory: V2/com.questvisionstream
+        run: npm ci
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check (client + tests + aliased library source)
+        run: npm run typecheck
+
+      - name: Run test suite (vitest)
+        run: npm test

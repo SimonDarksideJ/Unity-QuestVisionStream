@@ -1,0 +1,30 @@
+{
+  "name": "quest-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QuestVisionStream WebXR client — a Meta IWSDK app that file-links the reusable com.questvisionstream streaming library and renders detections as world-anchored tags.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@iwsdk/core": "^0.4.2",
+    "@questvisionstream/client": "file:../com.questvisionstream",
+    "@realitycollective/service-framework": "^1.0.0",
+    "@realitycollective/service-framework-iwsdk": "^1.0.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/three": "^0.185.0",
+    "happy-dom": "16.8.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.11",
+    "vitest": "3.2.4"
+  }
+}

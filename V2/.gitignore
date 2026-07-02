@@ -1,0 +1,16 @@
+# Node / TypeScript
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+# Downloaded model weights (auto-fetched at runtime)
+QuestVisionStreamServer/models/
+
+# OS / editor
+.DS_Store

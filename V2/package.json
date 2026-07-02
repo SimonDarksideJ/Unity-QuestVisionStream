@@ -1,0 +1,11 @@
+{
+  "name": "questvisionstream-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "V2 monorepo root: the com.questvisionstream streaming library (built on the published @realitycollective/service-framework) and the IWSDK Quest WebXR client.",
+  "scripts": {
+    "install:all": "npm --prefix com.questvisionstream install && npm --prefix quest-client install",
+    "build": "npm --prefix com.questvisionstream run build && npm --prefix quest-client run build",
+    "typecheck": "npm --prefix com.questvisionstream run typecheck && npm --prefix quest-client run typecheck"
+  }
+}
