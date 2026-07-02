@@ -87,6 +87,12 @@ Every improvement pass follows the same three-step loop:
   disk.** The completion pass closed two API-gated deferrals in one sitting
   because the authoritative answer was in the installed package's `.d.ts`
   files all along; check `node_modules` typings before trusting a docs gap.
+- **Verify CI steps in a clean room.** `npm ci` in a consumer does NOT
+  install a `file:`-linked package's own `node_modules`, and imports resolve
+  from the symlink's *real* path — so a library installed earlier in the
+  session masks the gap locally while a fresh CI checkout fails. Before
+  trusting "the CI commands pass locally", delete every `node_modules` the
+  workflow doesn't explicitly create and re-run the exact steps.
 
 ## How to add an entry
 
