@@ -221,11 +221,16 @@ the other tests.
   achieves the same safety for the single-headset design. If multi-headset
   ever becomes a goal, that is a separate pass (per-connection instances or a
   batching queue).
-- **CI wiring.** The suite is self-contained
-  (`pip install -r requirements.txt -r requirements-dev.txt && python -m
-  pytest tests/ -c tests/pytest.ini --rootdir=.`) but the workflow file lives
-  above `V2/`, which was out of scope for this pass. Recommended next step: a
-  job mirroring the quest-client deploy workflow's build gate.
+- ~~**CI wiring.**~~ *Done as a follow-up:* `.github/workflows/v2-tests.yml`
+  now runs the server pytest suite plus typecheck gates for the library and
+  client on every PR/push touching `V2/` (docs excluded). The workflow also
+  publishes the `[STATS]` lines to the job summary each run, so the loop-stall
+  and lag numbers are visible per-commit and gradual regressions can be
+  spotted before they cross an assertion threshold. It needs no secrets, so
+  it runs identically on fork PRs. Note the client typecheck job deliberately
+  triggers on *library* changes too — the client bundles the library from
+  source, and the deploy workflow's gate only fires on `V2/quest-client/**`
+  paths, so library-only breakage was previously invisible to CI.
 - **Wire-format changes beyond additive `pts`.**
 
 ## Test inventory (18)

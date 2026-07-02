@@ -120,3 +120,7 @@ WebRTC layer is driven through fakes. The two performance tests print the
 measured event-loop stall and end-to-end lag; the improvement history with
 before/after numbers lives in
 [`../Documentation/improvements/`](../Documentation/improvements/README.md).
+
+CI runs this suite (plus the TypeScript typecheck gates) on every PR/push that
+touches `V2/` — see `.github/workflows/v2-tests.yml`; the measured stats are
+published to each run's job summary.
