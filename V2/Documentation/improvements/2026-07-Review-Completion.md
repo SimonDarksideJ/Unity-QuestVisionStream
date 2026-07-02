@@ -107,6 +107,26 @@ dispositioned**:
 | DI factory typing (`profile.ts` casts) | Belongs upstream in `@realitycollective/service-framework` | library entry |
 | Server config split-brain (detector env vars outside `ServerConfig`) | Cosmetic consolidation; documented behaviour | server entry §6 |
 
+## Addendum: post-merge CI failure (the field found a masked bug)
+
+After the PR merged, the first *real* GitHub runs of the client jobs failed —
+both the v2-tests client job and the deploy build job — with a cascade of
+`TS2307: Cannot find module '@realitycollective/service-framework'` errors
+from the **library source** the client type-checks via its alias.
+
+**Root cause:** `npm ci` in `quest-client` symlinks the `file:` library but
+does **not** install the library's own `node_modules`. Node/TS resolve
+imports from a symlink's *real path*, so the framework package must exist
+under `com.questvisionstream/` — and on a fresh checkout it doesn't. Every
+local verification in this session had passed only because the library's
+`node_modules` already existed from an earlier direct `npm ci` there.
+Reproduced deterministically by deleting the library's `node_modules` and
+running the exact CI steps; fixed by adding an
+"Install library dependencies" step (`npm ci` in `V2/com.questvisionstream`)
+before the client install in **both** workflows — the same order the V2
+monorepo's `install:all` script documents. The server and library CI jobs
+were unaffected (each installs its own tree).
+
 ## Lessons for the guide
 
 - **"Deferred" should mean "deferred pending a named unblocker", not

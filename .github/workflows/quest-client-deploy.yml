@@ -78,6 +78,14 @@ jobs:
           cache: npm
           cache-dependency-path: V2/quest-client/package-lock.json
 
+      - name: Install library dependencies (file-linked)
+        # `npm ci` in quest-client does NOT install the file-linked library's
+        # own node_modules; the typecheck/build compile the library from
+        # source and need @realitycollective/service-framework resolvable from
+        # the library directory. Same order as the V2 monorepo's install:all.
+        working-directory: V2/com.questvisionstream
+        run: npm ci
+
       - name: Install dependencies
         run: npm ci
 
