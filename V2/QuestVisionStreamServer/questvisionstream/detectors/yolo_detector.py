@@ -5,7 +5,7 @@ import os
 
 import numpy as np
 
-from .base import BaseDetector, Detection, select_device
+from .base import BaseDetector, Detection, resolve_half, select_device
 
 
 def _env_ignore() -> set[str]:
@@ -29,7 +29,10 @@ class YoloDetector(BaseDetector):
         self.conf = float(os.getenv("QVS_YOLO_CONF", "0.6"))
         # Latency levers (see DEPLOY docs): smaller imgsz + fp16 = faster.
         self.imgsz = int(os.getenv("QVS_YOLO_IMGSZ", "640"))
-        self.half = os.getenv("QVS_YOLO_HALF", "false").strip().lower() in {"1", "true", "yes", "on"}
+        half_requested = os.getenv("QVS_YOLO_HALF", "false").strip().lower() in {"1", "true", "yes", "on"}
+        self.half = resolve_half(half_requested, self.device)
+        if half_requested and not self.half:
+            print(f"[YOLO] QVS_YOLO_HALF ignored: fp16 requires CUDA (device={self.device})")
         self.ignore = _env_ignore()
 
         print(f"[YOLO] Loading {self.model_path} on {self.device} (imgsz={self.imgsz}, half={self.half})")

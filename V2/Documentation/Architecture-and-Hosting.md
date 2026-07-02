@@ -82,9 +82,11 @@ library unchanged.
 6. **Render** — `DetectionRenderSystem` normalizes each bbox (resolution-independent),
    unprojects it through the XR camera, and places a world-anchored tag.
 
-Wire format (identical to the Unity client, so one server serves both):
+Wire format (compatible with the Unity client, so one server serves both;
+`pts` is the media timestamp of the processed frame — additive, ignored by
+existing clients, groundwork for capture-pose alignment):
 ```json
-{ "type":"detections", "frame":123, "width":640, "height":480,
+{ "type":"detections", "frame":123, "pts":369000, "width":640, "height":480,
   "detections":[ { "label":"cup", "conf":0.82, "bbox":[x1,y1,x2,y2] } ] }
 ```
 
@@ -133,6 +135,7 @@ Key rules:
 | Which server the client dials | Pages KV `QVS_CONFIG`/`signaling_url` (live) or env var `QVS_SIGNALING_URL` (redeploy) via `/api/config`, or `?server=` | KV: live · env var: redeploy · `?server=`: per-open |
 | Client render knobs (camera res, invertY, placement, dedup) | `quest-client/src/config.ts` `AppConfig` | Build time |
 | Server host/port/detector/flips/ICE/TURN/YOLO levers | `QVS_*` env vars | Restart |
+| Server session security (auth token, Origin allowlist, connection cap) | `QVS_AUTH_TOKEN` / `QVS_ALLOWED_ORIGINS` / `QVS_MAX_CONNECTIONS` — see [server README](../QuestVisionStreamServer/README.md#configuration-qvs_) | Restart |
 | Client deploy (projects, branch, short codes) | `.github/workflows/quest-client-deploy.yml` | Repo |
 
 ---

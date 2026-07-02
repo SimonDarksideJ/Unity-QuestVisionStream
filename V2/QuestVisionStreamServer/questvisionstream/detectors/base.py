@@ -36,6 +36,12 @@ def select_device() -> str:
     return "cpu"
 
 
+def resolve_half(requested: bool, device: str) -> bool:
+    """FP16 inference is only reliable on CUDA — Ultralytics errors on CPU and
+    is flaky on MPS. Refuse the request (with the caller logging why) elsewhere."""
+    return requested and device == "cuda"
+
+
 def clamp_box(x1: float, y1: float, x2: float, y2: float, w: int, h: int) -> tuple[int, int, int, int]:
     """Clamp a box to image bounds and return integer coordinates."""
     xi1 = int(max(0, min(round(x1), w - 1)))

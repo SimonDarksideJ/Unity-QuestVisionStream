@@ -18,6 +18,16 @@ The single hub for all V2 documentation. Everything below lives here under
 | [Deploy-HuggingFace-Spaces.md](Deploy-HuggingFace-Spaces.md) | Run the server on Hugging Face Spaces (free cloud GPU). |
 | [Deployment-Cloudflare-Pages.md](Deployment-Cloudflare-Pages.md) | Deploy the WebXR client to Cloudflare Pages (isolated prod + staging) via GitHub Actions; create the `CLOUDFLARE_*` secrets; configure the server URL (KV binding / env var / `?server=`). |
 
+## Reviews & improvements
+
+- **[Architecture-Review-2026-07.md](Architecture-Review-2026-07.md)** — verified
+  technical review of the whole V2 tree (what works, bugs with file:line refs,
+  security posture, prioritized fixes).
+- **[improvements/](improvements/README.md)** — the improvement log + the
+  red→green→measure method guide. Each entry records why a change was made and
+  the before/after test stats. First entry:
+  [2026-07 server hardening](improvements/2026-07-Server-Hardening.md).
+
 ## Reference
 
 - **[IWSDK-API-Reference.md](IWSDK-API-Reference.md)** — source-verified `@iwsdk/core`

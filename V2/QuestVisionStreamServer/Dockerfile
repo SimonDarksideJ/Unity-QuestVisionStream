@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements-yolo.txt
 
 COPY questvisionstream ./questvisionstream
 
+# Run as a non-root user — this process is often exposed via tunnels.
+# HOME is writable so Ultralytics can cache auto-downloaded weights.
+RUN useradd --create-home --uid 10001 qvs && chown -R qvs /app
+USER qvs
+ENV HOME=/home/qvs
+
 ENV QVS_ENABLE_DISPLAY=false \
     QVS_HOST=0.0.0.0 \
     QVS_PORT=3000 \

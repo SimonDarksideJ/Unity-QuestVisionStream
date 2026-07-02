@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@iwsdk/core": "^0.4.2",
@@ -20,7 +22,9 @@
   "devDependencies": {
     "@types/node": "^22.20.0",
     "@types/three": "^0.185.0",
+    "happy-dom": "16.8.1",
     "typescript": "^5.5.4",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "3.2.4"
   }
 }

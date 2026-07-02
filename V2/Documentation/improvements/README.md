@@ -1,0 +1,107 @@
+# Improvements — strategy & method guide
+
+This folder is the running record of deliberate improvement passes over the V2
+codebase: what was changed, **why**, and the measured evidence that the change
+actually improved things. It doubles as a learning guide — each entry shows the
+method in action so future passes (by anyone, human or agent) follow the same
+discipline.
+
+## The method: prove it broken, fix it, prove it fixed
+
+Every improvement pass follows the same three-step loop:
+
+1. **RED — write the test first, watch it fail.** Before touching production
+   code, write a test that encodes the *desired* behaviour and run it against
+   the current code. The failure is the proof that the defect is real (not a
+   review-time guess) and the failure message/stats are the "before" baseline.
+   If you cannot make a test fail, you have not understood the defect yet —
+   stop and re-investigate.
+2. **GREEN — make the smallest change that passes.** Fix the production code.
+   Do not touch the test to make it pass (pacing/fixture bugs in the *test*
+   are the one exception — and note them in the entry when it happens, as in
+   entry 2026-07, where latest-frame-wins legitimately changed how test fakes
+   must feed frames).
+3. **MEASURE — capture before/after stats.** For behavioural bugs the stat is
+   binary (crashed → survives). For performance work the test itself should
+   *print* the measured quantity (loop stall, lag, throughput) so every future
+   run re-verifies the number, and the entry records both sides of the change.
+
+### Rules of thumb learned so far
+
+- **Test against fakes at the seams, not the heavy stack.** The server suite
+  runs without model weights, GPU, or a real WebRTC session: detectors are
+  plain functions, tracks are scripted objects with `recv()`, and signaling is
+  driven through a fake websocket. This keeps the suite ~2.5s and runnable
+  anywhere — which is the difference between tests that run and tests that rot.
+- **Make performance tests print their measurement.** An assertion threshold
+  says pass/fail; the printed `[STATS]` line is what goes in the entry and what
+  lets you spot gradual regressions before they cross the threshold.
+- **Wall-clock thresholds are load-sensitive.** The server's loop-stall
+  assertion tripped once when a Vite build ran concurrently on the same
+  machine (suite time 2.5s → 11.7s). Run perf-threshold suites without
+  competing load — CI does this naturally via separate jobs; locally, don't
+  parallelize them with builds.
+- **Watch for defects masking each other.** The event-loop-blocking bug hid
+  the backpressure bug: with the loop blocked, the test's frame *producer*
+  starved too, so queue lag looked tiny. Only after fixing the first defect
+  could the second one be measured honestly. When a "before" number looks
+  suspiciously good, ask what else is broken.
+- **Hold everything else constant when measuring.** The backpressure numbers
+  compare FIFO vs latest-frame-wins *with the executor fix applied to both* —
+  otherwise the stat conflates two changes.
+- **Behaviour changes ripple into test fixtures.** Latest-frame-wins means a
+  fake track that serves frames instantly will (correctly) have frames
+  dropped; tests that need every frame processed must pace the feed slower
+  than inference. Expect to revisit fixtures when you change scheduling
+  semantics — that is not "fudging the test" as long as the *assertion* stays
+  honest.
+- **Additive wire changes only.** New payload fields (like `pts`) must be
+  ignorable by existing clients (Unity `JsonUtility` and the TS guard both
+  ignore unknown fields). Never rename or re-type an existing field without a
+  coordinated client change.
+- **Mock the platform seam, not the library.** For browser-API code
+  (WebSocket, RTCPeerConnection), stub the globals with scriptable doubles
+  that *enforce the platform's contracts* (e.g. `addIceCandidate` throws
+  before the remote description is set). Timing races become deterministic
+  red tests instead of flaky field bugs.
+- **Lock baselines before fixing.** Write passing tests for the behaviour a
+  review verified as correct *first* — they pin it so the fixes can't regress
+  it unnoticed. In the library pass, 21 of 36 tests were baseline locks.
+- **Fix shared-layer gaps in the shared layer.** Session recovery could have
+  been patched in the quest-client, but every future host would inherit the
+  gap; the re-offer state machine belongs in the library next to the state it
+  reasons about.
+- **Mock the framework, test the system.** For ECS hosts, mock the engine's
+  base class (`createSystem`) at the module seam and run the system's real
+  logic against real math objects (three.js cameras/scenes) — the client
+  pass's placement test caught a 0.75 m error in actual matrix math.
+- **Assert against the instance the code under test holds.** A fixture that
+  fabricates a fresh object per call (e.g. `getVideoTracks()` returning a new
+  track each time) makes the test observe a different object than the code
+  mutates — fixture identity bugs masquerade as product bugs.
+- **Defer wiring against unverified APIs.** If the platform API a fix needs
+  isn't in the verified reference (e.g. IWSDK reference-space reset), ship
+  the tested, callable seam (`clear()`) and record the one-line wiring as a
+  known follow-up instead of guessing.
+- **A deferral names its unblocker — and the unblocker may already be on
+  disk.** The completion pass closed two API-gated deferrals in one sitting
+  because the authoritative answer was in the installed package's `.d.ts`
+  files all along; check `node_modules` typings before trusting a docs gap.
+
+## How to add an entry
+
+1. Copy the structure of an existing entry (`2026-07-Server-Hardening.md`):
+   context → defect table → per-change sections (problem / evidence / change /
+   result) → stats table → lessons.
+2. Name it `YYYY-MM-<Topic>.md` and link it in the index below.
+3. Keep the red-run output (or its key lines) in the entry — the failing
+   evidence is the most instructive part for the next reader.
+
+## Index
+
+| Entry | Scope | Headline results |
+|-------|-------|------------------|
+| [2026-07 — Server hardening](2026-07-Server-Hardening.md) | `QuestVisionStreamServer` (Python) | Event-loop stall 316ms → 8.4ms; live-edge lag 1631ms (unbounded) → 60ms (bounded); 6 robustness/security gaps closed; first test suite (18 tests) |
+| [2026-07 — Library hardening](2026-07-Library-Hardening.md) | `com.questvisionstream` (TypeScript) | Offer-drop connect race fixed; early ICE candidates 3/3 lost → 3/3 applied; mid-session drop permanent → auto re-offer; 2 unhandled-rejection paths → 0; strict payload validation; first test suite (36 tests) |
+| [2026-07 — Client hardening](2026-07-Client-Hardening.md) | `quest-client` (IWSDK app) | Camera-error silent stall fixed; status surface (failures were console-only); capture-pose placement (0.75 m arrival-pose error → <1 µm of the capture ray); `?server=` validated; config fetch timeout; texture leak closed; first test suite (30 tests) |
+| [2026-07 — Review completion](2026-07-Review-Completion.md) | `quest-client` + deploy pipeline | Deferred items closed after source-verifying IWSDK APIs: in-AR status HUD (head-locked), recenter tag cleanup, pts-based dynamic latency estimation, `?server=` user confirmation, `/api/config` deploy smoke check; client suite 30 → 49 tests |

@@ -8,6 +8,11 @@ export interface NormalizeOptions {
    * Keep configurable to match the capture pipeline.
    */
   readonly invertY?: boolean;
+  /**
+   * Flip the X axis — for mirrored streams (front-facing cameras, or a server
+   * running with `QVS_FLIP_HORIZONTAL=true`). Default false.
+   */
+  readonly invertX?: boolean;
 }
 
 /**
@@ -26,6 +31,7 @@ export function normalizeDetection(
   options: NormalizeOptions = {},
 ): { center: NormalizedPoint; rect: NormalizedRect } {
   const invertY = options.invertY ?? true;
+  const invertX = options.invertX ?? false;
   const w = Math.max(1, frameWidth);
   const h = Math.max(1, frameHeight);
   const [x1, y1, x2, y2] = detection.bbox;
@@ -35,12 +41,14 @@ export function normalizeDetection(
   let nx = cx / w;
   let ny = cy / h;
   if (invertY) ny = 1 - ny;
+  if (invertX) nx = 1 - nx;
 
-  const rx = Math.min(x1, x2) / w;
+  let rx = Math.min(x1, x2) / w;
   const rw = Math.abs(x2 - x1) / w;
   let ry = Math.min(y1, y2) / h;
   const rh = Math.abs(y2 - y1) / h;
   if (invertY) ry = 1 - ry - rh;
+  if (invertX) rx = 1 - rx - rw;
 
   return { center: { x: nx, y: ny }, rect: { x: rx, y: ry, w: rw, h: rh } };
 }

@@ -4,11 +4,19 @@ import {
   makeServiceBridgeSystem,
   type CreateSystemLike,
 } from '@realitycollective/service-framework-iwsdk';
-import { createQuestVisionStreamProfile } from '@questvisionstream/client';
+import {
+  createQuestVisionStreamProfile,
+  IDetectionService,
+  IImageQualifierService,
+  ISignalingService,
+  IWebRTCService,
+} from '@questvisionstream/client';
 import { resolveSignalingUrl } from './config';
 import { setServiceManager } from './runtime';
 import { CameraStreamSystem } from './systems/CameraStreamSystem';
 import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
+import { StatusSpriteSystem } from './systems/StatusSpriteSystem';
+import { bindStatusDom, status, wireStatusServices } from './ui/status';
 
 /**
  * Quest WebXR client entry point.
@@ -22,6 +30,9 @@ import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
  */
 async function bootstrap(): Promise<void> {
   const signalingUrl = await resolveSignalingUrl();
+  status.set('server', signalingUrl);
+  const statusPanel = document.getElementById('status');
+  if (statusPanel) bindStatusDom(status, statusPanel);
 
   const container = document.getElementById('scene-container') as HTMLDivElement;
   const world = await World.create(container, {
@@ -51,6 +62,15 @@ async function bootstrap(): Promise<void> {
   );
   setServiceManager(manager);
 
+  // Every failure signal (camera, signaling, WebRTC, quality gate) is surfaced
+  // on the status panel — never console-only.
+  wireStatusServices(status, {
+    signaling: manager.resolve(ISignalingService),
+    webrtc: manager.resolve(IWebRTCService),
+    detection: manager.resolve(IDetectionService),
+    qualifier: manager.resolve(IImageQualifierService),
+  });
+
   // The -iwsdk shim uses minimal structural contracts (it never imports
   // @iwsdk/core), so we bridge the concrete IWSDK types here: `createSystem` and
   // the returned bridge class are cast at this documented interop seam.
@@ -65,7 +85,8 @@ async function bootstrap(): Promise<void> {
   world
     .registerSystem(bridgeSystem as never)
     .registerSystem(CameraStreamSystem)
-    .registerSystem(DetectionRenderSystem);
+    .registerSystem(DetectionRenderSystem)
+    .registerSystem(StatusSpriteSystem); // in-AR headline HUD (head-locked)
 
   console.info('[QuestClient] Ready. Streaming to', signalingUrl);
 }

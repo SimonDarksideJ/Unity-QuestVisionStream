@@ -17,9 +17,14 @@ export interface IceServerConfig {
 export interface WebRTCConfig {
   readonly iceServers?: readonly IceServerConfig[];
   readonly detectionsChannelLabel?: string;
+  /** Re-offer automatically after a failed session / restored signaling. Default true. */
+  readonly autoReconnect?: boolean;
+  /** Delay before an automatic re-offer, in ms. Default 2000. */
+  readonly reconnectDelayMs?: number;
 }
 
 const DEFAULT_ICE: IceServerConfig[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+const DEFAULT_RECONNECT_DELAY_MS = 2000;
 
 /** aiortc carries candidate lines without the `candidate:` prefix; strip it on send. */
 function stripCandidatePrefix(candidate: string): string {
@@ -39,7 +44,14 @@ export class WebRTCService
   private channel: RTCDataChannel | undefined;
   private stream: MediaStream | undefined;
   private _state: WebRTCConnectionState = 'new';
-  private unsub: (() => void) | undefined;
+  private readonly unsubs: Array<() => void> = [];
+  /** Remote candidates that arrived before the answer was applied (they must
+   * be queued: `addIceCandidate` throws while the remote description is null). */
+  private pendingCandidates: CandidateMessage[] = [];
+  private remoteDescriptionSet = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private intentionalClose = false;
+  private everAttempted = false;
 
   constructor(context: ServiceActivationContext<WebRTCConfig>, signaling: ISignalingService) {
     super(context);
@@ -52,16 +64,33 @@ export class WebRTCService
   private get channelLabel(): string {
     return this.serviceConfig.detectionsChannelLabel ?? 'detections';
   }
+  private get autoReconnect(): boolean {
+    return this.serviceConfig.autoReconnect ?? true;
+  }
+  private get reconnectDelayMs(): number {
+    return this.serviceConfig.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS;
+  }
 
   get connectionState(): WebRTCConnectionState {
     return this._state;
   }
 
   override start(): void {
-    this.unsub = this.signaling.on('message', (msg) => {
-      if (msg.type === 'answer') void this.onAnswer(msg.sdp);
-      else if (msg.type === 'candidate') void this.onRemoteCandidate(msg);
-    });
+    this.unsubs.push(
+      this.signaling.on('message', (msg) => {
+        if (msg.type === 'answer') void this.onAnswer(msg.sdp);
+        else if (msg.type === 'candidate') void this.onRemoteCandidate(msg);
+      }),
+    );
+    // Signaling came back after a drop: if our session never completed (or
+    // died with it), the server side no longer knows us — re-offer.
+    this.unsubs.push(
+      this.signaling.on('connected', () => {
+        if (this.everAttempted && this._state !== 'connected') {
+          this.scheduleReconnect('signaling restored');
+        }
+      }),
+    );
   }
 
   setVideoStream(stream: MediaStream): void {
@@ -69,11 +98,16 @@ export class WebRTCService
   }
 
   async connect(): Promise<void> {
+    this.clearReconnectTimer();
+    this.intentionalClose = false;
     if (this.pc) {
       log.warn('connect() called with an existing peer connection; closing old one');
-      this.close();
+      this.teardown();
     }
     if (!this.stream) throw new Error('setVideoStream() must be called before connect()');
+    this.everAttempted = true;
+    // SignalingService.connect() resolves only when the socket is OPEN, so the
+    // offer below cannot race a still-connecting socket.
     if (!this.signaling.isConnected) await this.signaling.connect();
 
     const pc = new RTCPeerConnection({ iceServers: this.iceServers as RTCIceServer[] });
@@ -109,26 +143,58 @@ export class WebRTCService
   }
 
   close(): void {
-    this.channel?.close();
-    this.pc?.close();
-    this.channel = undefined;
-    this.pc = undefined;
+    this.intentionalClose = true;
+    this.clearReconnectTimer();
+    this.teardown();
     this.setState('closed');
   }
 
   override destroy(): void {
-    this.unsub?.();
+    for (const unsub of this.unsubs.splice(0)) unsub();
     this.close();
     super.destroy();
   }
 
+  /** Release the current session's resources without touching reconnect intent. */
+  private teardown(): void {
+    this.channel?.close();
+    this.pc?.close();
+    this.channel = undefined;
+    this.pc = undefined;
+    this.remoteDescriptionSet = false;
+    this.pendingCandidates = [];
+  }
+
   private async onAnswer(sdp: string): Promise<void> {
-    if (!this.pc) return;
+    const pc = this.pc;
+    if (!pc) return;
     log.info('Answer received');
-    await this.pc.setRemoteDescription({ type: 'answer', sdp });
+    try {
+      await pc.setRemoteDescription({ type: 'answer', sdp });
+    } catch (err) {
+      // Never let this become an unhandled rejection (the caller is a
+      // fire-and-forget event handler). A bad answer is a protocol error, not
+      // a transient network fault — surface it, don't auto-retry into a loop.
+      log.error('Failed to apply answer SDP', err);
+      return;
+    }
+    if (this.pc !== pc) return; // session was replaced while applying
+    this.remoteDescriptionSet = true;
+    for (const queued of this.pendingCandidates.splice(0)) {
+      await this.applyCandidate(queued);
+    }
   }
 
   private async onRemoteCandidate(msg: CandidateMessage): Promise<void> {
+    if (!this.pc) return;
+    if (!this.remoteDescriptionSet) {
+      this.pendingCandidates.push(msg); // applied in order after the answer
+      return;
+    }
+    await this.applyCandidate(msg);
+  }
+
+  private async applyCandidate(msg: CandidateMessage): Promise<void> {
     if (!this.pc) return;
     try {
       await this.pc.addIceCandidate({
@@ -161,5 +227,25 @@ export class WebRTCService
     if (state === this._state) return;
     this._state = state;
     this.emit('stateChange', state);
+    // 'failed' is terminal (unlike 'disconnected', which ICE can self-heal);
+    // recover by renegotiating a fresh session.
+    if (state === 'failed') this.scheduleReconnect('peer connection failed');
+  }
+
+  private scheduleReconnect(reason: string): void {
+    if (!this.autoReconnect || this.intentionalClose || !this.stream) return;
+    if (this.reconnectTimer) return;
+    log.info(`Reconnecting in ${this.reconnectDelayMs}ms (${reason})`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      this.connect().catch((err) => log.warn('Reconnect attempt failed', err));
+    }, this.reconnectDelayMs);
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
   }
 }
