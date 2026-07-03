@@ -55,6 +55,14 @@ class VideoProcessor:
         self._window_processed = 0
         self._window_start = 0.0
         self._display_ok = True
+        # Time-throttled activity logging (independent of log_interval): the
+        # inbound stream is noted every 5 s (minimal — "frames are arriving"),
+        # while each detection reply is summarised every 1 s (resolution + what
+        # was found), so the console mirrors what the client shows.
+        self._last_recv_log = 0.0
+        self._recv_window_start = 0.0
+        self._recv_window_count = 0
+        self._last_sent_log = 0.0
 
     def _preprocess(self, frame) -> np.ndarray | None:
         try:
@@ -118,6 +126,9 @@ class VideoProcessor:
         print("[VideoProcessor] Processing started")
         loop = asyncio.get_running_loop()
         self._window_start = loop.time()
+        self._recv_window_start = loop.time()
+        self._last_recv_log = loop.time()
+        self._last_sent_log = loop.time()
 
         latest: Optional[Any] = None
         frame_ready = asyncio.Event()
@@ -130,10 +141,24 @@ class VideoProcessor:
                 while True:
                     frame = await track.recv()
                     self.frame_count += 1
+                    self._recv_window_count += 1
                     if latest is not None:
                         self.dropped_count += 1
                     latest = frame
                     frame_ready.set()
+
+                    # Inbound heartbeat every 5 s — just "frames are arriving".
+                    now = loop.time()
+                    if now - self._last_recv_log >= 5.0:
+                        span = now - self._recv_window_start
+                        fps = self._recv_window_count / span if span > 0 else 0.0
+                        print(
+                            f"[QVS ↑] receiving frames — {frame.width}x{frame.height} "
+                            f"@ {fps:.1f} fps (received {self.frame_count}, dropped {self.dropped_count})"
+                        )
+                        self._last_recv_log = now
+                        self._recv_window_start = now
+                        self._recv_window_count = 0
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -178,6 +203,18 @@ class VideoProcessor:
                         "detections": detections,
                     }
                 )
+
+                # Outbound reply summary every 1 s — resolution + what was found,
+                # so the console mirrors the client's receipt log.
+                now = loop.time()
+                if now - self._last_sent_log >= 1.0:
+                    if detections:
+                        labels = ", ".join(sorted({str(d["label"]) for d in detections}))
+                        found = f"{len(detections)} found: {labels}"
+                    else:
+                        found = "nothing found"
+                    print(f"[QVS ↓] detections {width}x{height} frame {self.frame_count} — {found}")
+                    self._last_sent_log = now
 
                 if not self._maybe_display(img, detections):
                     break

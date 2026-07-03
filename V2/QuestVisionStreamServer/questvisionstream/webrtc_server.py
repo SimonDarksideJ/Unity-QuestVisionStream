@@ -71,6 +71,29 @@ def _request_origin(websocket) -> Optional[str]:
     return getter("Origin") if getter else None
 
 
+def _client_ident(websocket) -> str:
+    """A human-readable identity for the connecting client.
+
+    Behind ``tailscale serve`` (or any reverse proxy) the socket peer is the
+    local proxy, so prefer the forwarded identity/address it injects — Tailscale
+    adds ``Tailscale-User-Login`` and ``X-Forwarded-For`` — and fall back to the
+    raw socket peer for direct LAN connections.
+    """
+    headers = getattr(websocket, "request_headers", None)
+    if headers is None:
+        headers = getattr(getattr(websocket, "request", None), "headers", {})
+    getter = getattr(headers, "get", None)
+    if getter:
+        for name in ("Tailscale-User-Login", "X-Forwarded-For"):
+            value = getter(name)
+            if value:
+                return str(value).split(",")[0].strip()
+    addr = getattr(websocket, "remote_address", None)
+    if isinstance(addr, (tuple, list)) and len(addr) >= 2:
+        return f"{addr[0]}:{addr[1]}"
+    return "unknown"
+
+
 def _parse_signaling_message(raw) -> Optional[dict]:
     """Decode one signaling message; None if it isn't a typed JSON object."""
     try:
@@ -138,7 +161,8 @@ class WebRTCServer:
             return
         await self._enforce_connection_cap()
 
-        print("[WebRTC] Client connected")
+        client = _client_ident(websocket)
+        print(f"[QVS] Client connected: {client}")
         pc = RTCPeerConnection(RTCConfiguration(iceServers=_build_ice_servers(self.config)))
         self.pcs.add(pc)
         session = (websocket, pc)
@@ -227,7 +251,7 @@ class WebRTCServer:
                 except Exception as exc:
                     print(f"[WebRTC] Error handling '{data['type']}' message: {exc}")
         except websockets.ConnectionClosed:
-            print("[WebRTC] Client disconnected")
+            print(f"[QVS] Client disconnected: {client}")
         except Exception as exc:
             print(f"[WebRTC] Session error: {exc}")
         finally:

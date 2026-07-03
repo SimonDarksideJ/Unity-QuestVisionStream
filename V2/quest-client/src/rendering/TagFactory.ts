@@ -1,5 +1,40 @@
 import * as THREE from 'three';
 
+/** Detection accent colour — red, matching the Unity reference outline boxes. */
+export const DETECTION_RED = '#ff3b30';
+
+/**
+ * A hollow **red bounding box** with a label — the WebXR analogue of the Unity
+ * `SentisInferenceUiManager` 2D outline box (`fillCenter=false`), placed in 3D
+ * at the detection's capture-time pose.
+ *
+ * `corners` are the four box corners already unprojected to WORLD space
+ * (TL, TR, BR, BL order). The `LineLoop` closes automatically, so the four
+ * points draw a closed rectangle. The label sits just above the top edge.
+ */
+export function createDetectionBox(
+  corners: readonly THREE.Vector3[],
+  label: string,
+): THREE.Object3D {
+  const group = new THREE.Group();
+
+  const geometry = new THREE.BufferGeometry().setFromPoints(corners as THREE.Vector3[]);
+  const outline = new THREE.LineLoop(
+    geometry,
+    new THREE.LineBasicMaterial({ color: DETECTION_RED }),
+  );
+  group.add(outline);
+
+  // Label anchored to the visually-topmost corner, nudged up so it clears the line.
+  const top = corners.reduce((a, b) => (b.y > a.y ? b : a), corners[0]!);
+  const sprite = createTextSprite(label, DETECTION_RED);
+  sprite.position.copy(top);
+  sprite.position.y += 0.035;
+  group.add(sprite);
+
+  return group;
+}
+
 /**
  * Builds the visual for a world-anchored detection tag: a small emissive marker
  * plus a billboarded text label rendered to a canvas texture. This is the WebXR
@@ -62,7 +97,7 @@ export function setTagLabel(tag: THREE.Object3D, label: string): void {
 }
 
 /** Billboarded canvas-text sprite (also used by the in-AR status HUD). */
-export function createTextSprite(text: string): THREE.Sprite {
+export function createTextSprite(text: string, color = '#00e5ff'): THREE.Sprite {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
   const fontSize = 48;
@@ -78,7 +113,7 @@ export function createTextSprite(text: string): THREE.Sprite {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
   roundRect(ctx, 0, 0, canvas.width, canvas.height, 16);
   ctx.fill();
-  ctx.fillStyle = '#00e5ff';
+  ctx.fillStyle = color;
   ctx.fillText(text, padding, canvas.height / 2);
 
   const texture = new THREE.CanvasTexture(canvas);

@@ -17,6 +17,16 @@ import { CameraStreamSystem } from './systems/CameraStreamSystem';
 import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
 import { StatusSpriteSystem } from './systems/StatusSpriteSystem';
 import { bindStatusDom, status, wireStatusServices } from './ui/status';
+import { uiLog } from './ui/uiLog';
+
+/** Host portion of a ws(s):// URL for compact display, or the raw value. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
 
 /**
  * Quest WebXR client entry point.
@@ -30,9 +40,14 @@ import { bindStatusDom, status, wireStatusServices } from './ui/status';
  */
 async function bootstrap(): Promise<void> {
   const signalingUrl = await resolveSignalingUrl();
+  const serverHost = hostOf(signalingUrl);
   status.set('server', signalingUrl);
   const statusPanel = document.getElementById('status');
   if (statusPanel) bindStatusDom(status, statusPanel);
+
+  // Subtle bottom-left activity log (flat-browser / pre-AR debugging visibility).
+  uiLog.mount();
+  uiLog.push(`● server: ${serverHost}`);
 
   const container = document.getElementById('scene-container') as HTMLDivElement;
   const world = await World.create(container, {
@@ -64,12 +79,19 @@ async function bootstrap(): Promise<void> {
 
   // Every failure signal (camera, signaling, WebRTC, quality gate) is surfaced
   // on the status panel — never console-only.
+  const signaling = manager.resolve(ISignalingService);
   wireStatusServices(status, {
-    signaling: manager.resolve(ISignalingService),
+    signaling,
     webrtc: manager.resolve(IWebRTCService),
     detection: manager.resolve(IDetectionService),
     qualifier: manager.resolve(IImageQualifierService),
   });
+
+  // Connection state → activity log, naming the server it's talking to.
+  signaling.on('connected', () => uiLog.push(`● connected to ${serverHost}`));
+  signaling.on('disconnected', (code) =>
+    uiLog.push(`● disconnected from ${serverHost} (code ${code}) — retrying`),
+  );
 
   // The -iwsdk shim uses minimal structural contracts (it never imports
   // @iwsdk/core), so we bridge the concrete IWSDK types here: `createSystem` and

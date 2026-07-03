@@ -8,6 +8,7 @@ import {
 import { AppConfig } from '../config';
 import { getServiceManager } from '../runtime';
 import { status } from '../ui/status';
+import { uiLog } from '../ui/uiLog';
 
 /**
  * Owns the passthrough camera. Creates the `CameraSource` entity, and once the
@@ -75,6 +76,18 @@ export class CameraStreamSystem extends createSystem({}) {
       const desired = this.qualifier.shouldStream;
       if (this.videoTrack.enabled !== desired) this.videoTrack.enabled = desired;
     }
+
+    // Streaming heartbeat (every 5 s): a minimal "data is leaving the client"
+    // signal — deliberately terse (the connection/resolution detail lives in
+    // the connect line and the server's detection replies).
+    const streaming = this.videoTrack?.enabled ?? false;
+    uiLog.throttle(
+      'tx',
+      5000,
+      streaming
+        ? `↑ streaming camera frames (${AppConfig.camera.width}×${AppConfig.camera.height})`
+        : '↑ frames paused — low light (edge quality gate)',
+    );
   }
 
   private beginStreaming(stream: MediaStream): void {
