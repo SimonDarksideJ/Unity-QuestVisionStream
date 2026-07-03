@@ -13,8 +13,13 @@
  */
 
 export const AppConfig = {
-  /** Camera capture request (server downsamples further). */
-  camera: { facing: 'back' as const, width: 1280, height: 960, frameRate: 30 },
+  /**
+   * Camera capture request (server downsamples further). `facing: 'unknown'`
+   * means "use whatever camera is available" — on Quest the passthrough camera
+   * enumerates as a single front-labelled device, so requesting `back` fails
+   * ("No back-facing camera available"). Use the available one.
+   */
+  camera: { facing: 'unknown' as const, width: 1280, height: 960, frameRate: 30 },
   /** Flip Y when mapping stream boxes to the viewport (matches server v-flip). */
   invertY: true,
   /** Fixed placement distance (m) along the detection ray when no depth hit. */

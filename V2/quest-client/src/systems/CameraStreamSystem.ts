@@ -42,10 +42,11 @@ export class CameraStreamSystem extends createSystem({}) {
     this.sampleCanvas.width = this.sampleW;
     this.sampleCanvas.height = this.sampleH;
 
-    void CameraUtils.getDevices(); // request permission early
     status.set('camera', 'starting…');
     this.startedAt =
       typeof performance !== 'undefined' ? performance.now() : Date.now();
+    // Diagnostics also grant permission (via the getUserMedia probe), so the
+    // redundant early CameraUtils.getDevices() is intentionally omitted.
     void this.runCameraDiagnostics();
 
     this.cameraEntity = this.world.createEntity();
@@ -160,6 +161,58 @@ export class CameraStreamSystem extends createSystem({}) {
       status.set('device', `${summary} · ${hint}`);
       uiLog.push(`▲ ${hint}`);
       console.warn('[CameraStream] ' + hint);
+      return;
+    }
+    await this.probeCapture();
+  }
+
+  /**
+   * Decisively test whether a camera stream actually OPENS — enumerate/labels
+   * succeed whenever permission was ever granted, but they don't prove
+   * `getUserMedia` resolves. Runs first (before IWSDK's own capture) with a
+   * timeout, so a hang is reported instead of leaving "starting…" forever. The
+   * outcome pinpoints the failure:
+   *   - timed out  → the stream never opens (Quest passthrough often needs an
+   *                  ACTIVE immersive session — tap Enter AR first)
+   *   - NotReadableError / in-use → already opened elsewhere; the hang is later
+   *   - OK w/ dims → getUserMedia is fine; the problem is downstream
+   */
+  private async probeCapture(): Promise<void> {
+    const md = navigator.mediaDevices;
+    if (!md?.getUserMedia) {
+      uiLog.push('▲ getUserMedia unavailable in this browser');
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), 6000);
+    });
+    try {
+      const result = await Promise.race([md.getUserMedia({ video: true }), timeout]);
+      if (result === 'timeout') {
+        const msg =
+          'getUserMedia timed out (6s) — stream will not open; on Quest passthrough usually needs an ACTIVE AR session (tap Enter AR)';
+        status.set('device', msg);
+        uiLog.push(`▲ ${msg}`);
+        console.warn('[CameraStream] ' + msg);
+        return;
+      }
+      const stream = result as MediaStream;
+      const track = stream.getVideoTracks()[0];
+      const s = track?.getSettings?.() ?? {};
+      const info = `getUserMedia OK — ${s.width ?? '?'}×${s.height ?? '?'} facing=${s.facingMode ?? '?'}`;
+      status.set('device', info);
+      uiLog.push(`▣ ${info}`);
+      console.info('[CameraStream] ' + info);
+      stream.getTracks().forEach((t) => t.stop());
+    } catch (err) {
+      const name = err instanceof Error ? err.name : String(err);
+      const msg = `getUserMedia failed: ${name}`;
+      status.set('device', msg);
+      uiLog.push(`▲ ${msg}`);
+      console.warn('[CameraStream] ' + msg, err);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
