@@ -19,6 +19,13 @@ import { StatusSpriteSystem } from './systems/StatusSpriteSystem';
 import { bindStatusDom, status, wireStatusServices } from './ui/status';
 import { uiLog } from './ui/uiLog';
 
+/**
+ * Client build stamp, reported to the server on connect (`client = …`). Bump the
+ * suffix whenever behaviour changes so a stale Cloudflare deploy is obvious in
+ * the server log instead of being mistaken for a live bug.
+ */
+const CLIENT_BUILD = '0.1.9 cid+keepalive+hardening';
+
 /** Host portion of a ws(s):// URL for compact display, or the raw value. */
 function hostOf(url: string): string {
   try {
@@ -237,6 +244,7 @@ async function bootstrap(): Promise<void> {
     uiLog.push(`● connected to ${serverHost}`);
     connectedAt = performance.now();
     sentStatus = {}; // (re)connect → resend the full current state
+    sendStatus('client', CLIENT_BUILD); // so the server log shows the live build
     flushStatus();
     if (prevClose) {
       sendStatus('link', prevClose);
