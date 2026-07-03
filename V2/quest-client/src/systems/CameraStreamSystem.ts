@@ -42,6 +42,28 @@ export class CameraStreamSystem extends createSystem({}) {
     this.sampleCanvas.width = this.sampleW;
     this.sampleCanvas.height = this.sampleH;
 
+    status.set('camera', 'idle — enter XR to start');
+
+    // Gate ALL capture on an ACTIVE XR session: nothing starts in the flat
+    // browser view (the 2D page is just the welcome screen), and — helpfully —
+    // Quest passthrough getUserMedia tends to require an active session anyway.
+    const xr = (this.world as unknown as { renderer?: { xr?: EventTarget } })?.renderer?.xr;
+    if (xr?.addEventListener) {
+      const onStart = (): void => {
+        xr.removeEventListener?.('sessionstart', onStart);
+        this.startCapture();
+      };
+      xr.addEventListener('sessionstart', onStart);
+    } else {
+      // No XR manager (tests / non-XR host) — start immediately so existing
+      // behaviour and unit tests are unchanged.
+      this.startCapture();
+    }
+  }
+
+  /** Begin capture: run diagnostics and create the CameraSource. Idempotent. */
+  private startCapture(): void {
+    if (this.cameraEntity) return;
     status.set('camera', 'starting…');
     this.startedAt =
       typeof performance !== 'undefined' ? performance.now() : Date.now();

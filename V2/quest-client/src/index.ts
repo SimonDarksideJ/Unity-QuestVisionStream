@@ -1,4 +1,4 @@
-import { World, SessionMode, VisibilityState, createSystem } from '@iwsdk/core';
+import { World, SessionMode, VisibilityState, createSystem, launchXR } from '@iwsdk/core';
 import {
   startServiceRuntime,
   makeServiceBridgeSystem,
@@ -29,6 +29,100 @@ function hostOf(url: string): string {
 }
 
 /**
+ * Wire the flat-page welcome screen. "Enter XR" is enabled only once BOTH
+ * immersive AR is available AND the signaling socket is connected (the socket
+ * connects on page load; the camera does not — that waits for the session). A
+ * failed/dropped socket shows a red hint. Launching needs a click (the user
+ * gesture `requestSession` requires); the intro hides while the session runs.
+ */
+function wireIntro(world: World, signaling: ISignalingService): void {
+  const intro = document.getElementById('intro');
+  const button = document.getElementById('enter-xr') as HTMLButtonElement | null;
+  const note = document.getElementById('intro-note');
+  if (!button) return;
+
+  let xrChecked = false;
+  let xrSupported = false;
+  let conn: 'connecting' | 'connected' | 'failed' = signaling.isConnected
+    ? 'connected'
+    : 'connecting';
+
+  const setNote = (text: string, error = false): void => {
+    if (!note) return;
+    note.textContent = text;
+    note.classList.toggle('error', error);
+  };
+
+  const render = (): void => {
+    if (!xrChecked) {
+      button.disabled = true;
+      button.textContent = 'Checking XR…';
+      return;
+    }
+    if (!xrSupported) {
+      button.disabled = true;
+      button.textContent = 'XR unavailable';
+      setNote('Immersive AR isn’t supported here — open this page on a Meta Quest.');
+      return;
+    }
+    button.textContent = conn === 'connecting' ? 'Connecting…' : 'Enter XR';
+    button.disabled = conn !== 'connected';
+    if (conn === 'connected') setNote('');
+    else if (conn === 'connecting') setNote('Connecting to server…');
+    else setNote('Unable to connect to server, have you connected the VPN and started the server?', true);
+  };
+
+  const showIntro = (show: boolean): void => {
+    intro?.classList.toggle('hidden', !show);
+  };
+  const xr = (world as unknown as { renderer?: { xr?: EventTarget } }).renderer?.xr;
+  xr?.addEventListener?.('sessionstart', () => showIntro(false));
+  xr?.addEventListener?.('sessionend', () => showIntro(true));
+
+  signaling.on('connected', () => {
+    conn = 'connected';
+    render();
+  });
+  signaling.on('disconnected', () => {
+    conn = 'failed';
+    render();
+  });
+
+  button.addEventListener('click', () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = 'Starting…';
+    setNote('');
+    try {
+      launchXR(world, { sessionMode: SessionMode.ImmersiveAR });
+    } catch (err) {
+      setNote(`Could not start XR: ${err instanceof Error ? err.message : String(err)}`, true);
+      render();
+    }
+  });
+
+  render();
+  const query = navigator.xr?.isSessionSupported?.('immersive-ar');
+  if (!query) {
+    xrChecked = true;
+    xrSupported = false;
+    render();
+    return;
+  }
+  void query
+    .then((supported) => {
+      xrChecked = true;
+      xrSupported = supported;
+      render();
+    })
+    .catch(() => {
+      xrChecked = true;
+      xrSupported = false;
+      render();
+    });
+}
+
+/**
  * Quest WebXR client entry point.
  *
  *  1. Create the IWSDK world (camera + environment raycast).
@@ -54,7 +148,9 @@ async function bootstrap(): Promise<void> {
     render: { near: 0.01, far: 100 },
     xr: {
       sessionMode: SessionMode.ImmersiveAR,
-      offer: 'always',
+      // No auto-offer: the flat page is a welcome screen with our own "Enter XR"
+      // button (see wireIntro), so nothing XR/camera-related starts in-browser.
+      offer: 'none',
       features: {
         hitTest: { required: false },
         layers: true,
@@ -129,6 +225,10 @@ async function bootstrap(): Promise<void> {
     .registerSystem(CameraStreamSystem)
     .registerSystem(DetectionRenderSystem)
     .registerSystem(StatusSpriteSystem); // in-AR headline HUD (head-locked)
+
+  // Flat-page welcome screen + our own "Enter XR" button (no auto-offer).
+  // Enabled only once the signaling socket connects (camera still waits for XR).
+  wireIntro(world, signaling);
 
   console.info('[QuestClient] Ready. Streaming to', signalingUrl);
 }
