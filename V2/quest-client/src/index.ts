@@ -87,8 +87,28 @@ async function bootstrap(): Promise<void> {
     qualifier: manager.resolve(IImageQualifierService),
   });
 
+  // Device-status uplink: forward status fields to the server over the signaling
+  // socket, so device-side problems (camera permission, no capture device) are
+  // visible in the SERVER console too — even before/without a WebRTC connection.
+  let sentStatus: Record<string, string> = {};
+  const sendStatus = (field: string, value: string): void => {
+    if (!signaling.isConnected || sentStatus[field] === value) return;
+    sentStatus[field] = value;
+    signaling.send({ type: 'status', field, value });
+  };
+  const flushStatus = (): void => {
+    for (const [field, value] of Object.entries(status.snapshot())) {
+      if (value) sendStatus(field, value);
+    }
+  };
+  status.onChange(flushStatus);
+
   // Connection state → activity log, naming the server it's talking to.
-  signaling.on('connected', () => uiLog.push(`● connected to ${serverHost}`));
+  signaling.on('connected', () => {
+    uiLog.push(`● connected to ${serverHost}`);
+    sentStatus = {}; // (re)connect → resend the full current state
+    flushStatus();
+  });
   signaling.on('disconnected', (code) =>
     uiLog.push(`● disconnected from ${serverHost} (code ${code}) — retrying`),
   );

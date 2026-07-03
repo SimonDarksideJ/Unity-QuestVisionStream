@@ -247,6 +247,12 @@ class WebRTCServer:
                         await on_offer(data)
                     elif data["type"] == "candidate":
                         await on_candidate(data)
+                    elif data["type"] == "status":
+                        # Client → server device/telemetry status (camera, signaling,
+                        # errors). Surfaced so device-side problems are visible here.
+                        field = data.get("field", "?")
+                        value = data.get("value", "")
+                        print(f"[QVS ◂] {client} status: {field} = {value}")
                     # Unknown types are ignored (forward compatibility).
                 except Exception as exc:
                     print(f"[WebRTC] Error handling '{data['type']}' message: {exc}")

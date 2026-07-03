@@ -30,6 +30,9 @@ export class CameraStreamSystem extends createSystem({}) {
   private qualifier: QualifierService | undefined;
   private connected = false;
   private cameraFailed = false;
+  private startedAt = 0;
+  private stallReported = false;
+  private readonly stallDeadlineMs = 8000;
 
   private readonly sampleCanvas = document.createElement('canvas');
   private readonly sampleW = 64;
@@ -41,6 +44,9 @@ export class CameraStreamSystem extends createSystem({}) {
 
     void CameraUtils.getDevices(); // request permission early
     status.set('camera', 'starting…');
+    this.startedAt =
+      typeof performance !== 'undefined' ? performance.now() : Date.now();
+    void this.runCameraDiagnostics();
 
     this.cameraEntity = this.world.createEntity();
     this.cameraEntity.addComponent(CameraSource, {
@@ -64,7 +70,10 @@ export class CameraStreamSystem extends createSystem({}) {
         console.error('[CameraStream] CameraSource entered Error state (permission denied?)');
         return;
       }
-      if (state !== CameraState.Active) return;
+      if (state !== CameraState.Active) {
+        this.maybeWarnStall(state);
+        return;
+      }
       const stream = this.cameraEntity.getValue(CameraSource, 'stream') as MediaStream | null;
       if (!stream) return;
       this.beginStreaming(stream);
@@ -107,6 +116,69 @@ export class CameraStreamSystem extends createSystem({}) {
     // Cache the handle — resolving by token every frame is a wasted lookup.
     this.qualifier = getServiceManager().resolve(IImageQualifierService);
     this.qualifier.setFrameProvider(() => this.grabQualifierFrame());
+  }
+
+  /**
+   * Report what the browser exposes for capture, so a stuck "starting…" is
+   * explainable. IWSDK's camera uses `navigator.mediaDevices.getUserMedia` (a
+   * standard webcam) — NOT Meta's passthrough camera API — so on a Quest this
+   * commonly finds no usable device. Best-effort; guarded for environments
+   * without the APIs (and for tests).
+   */
+  private async runCameraDiagnostics(): Promise<void> {
+    let perm = 'unknown';
+    try {
+      const permissions = navigator.permissions as
+        | { query?: (d: { name: string }) => Promise<{ state: string }> }
+        | undefined;
+      const result = await permissions?.query?.({ name: 'camera' });
+      if (result?.state) perm = result.state;
+    } catch {
+      /* Permissions API / the 'camera' name is unsupported on some browsers. */
+    }
+
+    let cameras = -1;
+    let labels = '';
+    try {
+      const devices = (await navigator.mediaDevices?.enumerateDevices?.()) ?? [];
+      const video = devices.filter((d) => d.kind === 'videoinput');
+      cameras = video.length;
+      labels = video.map((d) => d.label || '(unlabeled)').join(', ');
+    } catch (err) {
+      console.warn('[CameraStream] enumerateDevices failed', err);
+    }
+
+    const summary =
+      cameras < 0
+        ? `perm=${perm}, devices unavailable`
+        : `perm=${perm}, ${cameras} camera(s)${labels ? ` — ${labels}` : ''}`;
+    status.set('device', summary);
+    uiLog.push(`▣ camera: ${summary}`);
+    if (cameras === 0) {
+      const hint =
+        'no getUserMedia camera on this device — Quest passthrough needs WebXR camera-access, not getUserMedia';
+      status.set('device', `${summary} · ${hint}`);
+      uiLog.push(`▲ ${hint}`);
+      console.warn('[CameraStream] ' + hint);
+    }
+  }
+
+  /**
+   * Watchdog: if the camera never leaves `starting`/`inactive`, say so instead
+   * of leaving the user staring at "starting…" forever — usually a pending
+   * permission prompt or no capture device (see {@link runCameraDiagnostics}).
+   */
+  private maybeWarnStall(state: unknown): void {
+    if (this.stallReported) return;
+    if (state !== CameraState.Starting && state !== CameraState.Inactive) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now - this.startedAt < this.stallDeadlineMs) return;
+    this.stallReported = true;
+    const msg =
+      'camera still starting after 8s — pending permission prompt, or no capture device (see camera diag above)';
+    status.set('camera', `starting… — ${msg}`);
+    uiLog.push(`▲ ${msg}`);
+    console.warn('[CameraStream] ' + msg);
   }
 
   /** Capture a downsampled RGBA frame for the qualifier modules. */

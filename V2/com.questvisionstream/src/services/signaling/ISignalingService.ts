@@ -21,7 +21,19 @@ export interface CandidateMessage {
   sdpMLineIndex: number;
 }
 
-export type SignalingOutbound = OfferMessage | CandidateMessage;
+/**
+ * Client → server device/telemetry status, carried over the signaling socket so
+ * it works BEFORE (or without) a WebRTC connection — the point at which most
+ * device problems (camera permission, no passthrough device) actually happen.
+ * The server logs these; they are not part of the WebRTC handshake.
+ */
+export interface StatusMessage {
+  type: 'status';
+  field: string;
+  value: string;
+}
+
+export type SignalingOutbound = OfferMessage | CandidateMessage | StatusMessage;
 export type SignalingInbound = AnswerMessage | CandidateMessage;
 
 /**

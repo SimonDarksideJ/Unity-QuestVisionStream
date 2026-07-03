@@ -206,8 +206,10 @@ fi
 #  4. Start the streaming server
 # --------------------------------------------------------------------------- #
 SERVER_PID=""
+TAIL_PID=""
 cleanup() {
   step "Shutting down"
+  [[ -n "$TAIL_PID" ]] && kill "$TAIL_PID" 2>/dev/null || true
   [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null || true
   "$TS" serve --bg --https=443 off >/dev/null 2>&1 || true
   ok "Stopped the server and removed the Tailscale serve mount"
@@ -224,7 +226,9 @@ wait_for() {  # wait_for <url> <label> <max_seconds>
 step "Starting the streaming server (detector=${QVS_DETECTOR:-yolo})"
 cd "$SERVER_DIR"
 # run-local.sh creates the venv, installs deps, sets the MPS env, and execs the server.
-QVS_PORT="$SIGNAL_PORT" QVS_HEALTH_PORT="$HEALTH_PORT" \
+# PYTHONUNBUFFERED=1 forces line/stream flushing — otherwise Python block-buffers
+# stdout when it's a file (not a TTY) and the [QVS] logs appear in laggy bursts.
+QVS_PORT="$SIGNAL_PORT" QVS_HEALTH_PORT="$HEALTH_PORT" PYTHONUNBUFFERED=1 \
   nohup ./run-local.sh > "$RUN_DIR/server.log" 2>&1 &
 SERVER_PID=$!
 info "server.log → $RUN_DIR/server.log (pid $SERVER_PID)"
@@ -313,6 +317,12 @@ MSG
   exit 0
 fi
 
-info "Press Ctrl-C to stop the server and remove the Tailscale serve mount."
+info "Live server log below (client connects, frames ↑, detections ↓) — Ctrl-C stops everything."
+printf '%s──────────────────────────────────────────────────────────────%s\n' "$DIM" "$Z"
+# Stream the server log to THIS console. The server is backgrounded (so the
+# health + serve steps above could gate on it), so we tail its log here rather
+# than run it in the foreground. cleanup() kills this on Ctrl-C.
+tail -n 20 -f "$RUN_DIR/server.log" &
+TAIL_PID=$!
 while kill -0 "$SERVER_PID" 2>/dev/null; do sleep 2; done
 warn "The server process exited — check $RUN_DIR/server.log."

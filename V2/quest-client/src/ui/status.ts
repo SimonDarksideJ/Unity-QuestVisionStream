@@ -22,6 +22,7 @@ import type {
 export type StatusField =
   | 'server'
   | 'camera'
+  | 'device'
   | 'signaling'
   | 'connection'
   | 'quality'
@@ -71,6 +72,7 @@ function hostOf(url: string | undefined): string {
 const FIELD_ORDER: readonly StatusField[] = [
   'server',
   'camera',
+  'device',
   'signaling',
   'connection',
   'quality',
@@ -99,6 +101,11 @@ export class StatusModel {
   onChange(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Current fields as a plain object — used to diff for the server uplink. */
+  snapshot(): Partial<Record<StatusField, string>> {
+    return Object.fromEntries(this.fields) as Partial<Record<StatusField, string>>;
   }
 
   /**
