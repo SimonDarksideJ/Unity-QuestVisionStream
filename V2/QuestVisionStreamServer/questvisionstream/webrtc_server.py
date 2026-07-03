@@ -250,9 +250,12 @@ class WebRTCServer:
                     elif data["type"] == "status":
                         # Client → server device/telemetry status (camera, signaling,
                         # errors). Surfaced so device-side problems are visible here.
-                        field = data.get("field", "?")
-                        value = data.get("value", "")
-                        print(f"[QVS ◂] {client} status: {field} = {value}")
+                        # `__`-prefixed fields (e.g. __keepalive) are traffic-only —
+                        # they keep proxies from idling the socket; don't log them.
+                        field = str(data.get("field", "?"))
+                        if not field.startswith("__"):
+                            value = data.get("value", "")
+                            print(f"[QVS ◂] {client} status: {field} = {value}")
                     # Unknown types are ignored (forward compatibility).
                 except Exception as exc:
                     print(f"[WebRTC] Error handling '{data['type']}' message: {exc}")

@@ -43,6 +43,7 @@ function wireIntro(world: World, signaling: ISignalingService): void {
 
   let xrChecked = false;
   let xrSupported = false;
+  let lastCloseCode = 0;
   let conn: 'connecting' | 'connected' | 'failed' = signaling.isConnected
     ? 'connected'
     : 'connecting';
@@ -69,6 +70,8 @@ function wireIntro(world: World, signaling: ISignalingService): void {
     button.disabled = conn !== 'connected';
     if (conn === 'connected') setNote('');
     else if (conn === 'connecting') setNote('Connecting to server…');
+    else if (lastCloseCode === 4000)
+      setNote('Another tab or device is already connected — close it, then reload to take over.', true);
     else setNote('Unable to connect to server, have you connected the VPN and started the server?', true);
   };
 
@@ -83,8 +86,9 @@ function wireIntro(world: World, signaling: ISignalingService): void {
     conn = 'connected';
     render();
   });
-  signaling.on('disconnected', () => {
+  signaling.on('disconnected', (code) => {
     conn = 'failed';
+    lastCloseCode = code;
     render();
   });
 
@@ -199,15 +203,40 @@ async function bootstrap(): Promise<void> {
   };
   status.onChange(flushStatus);
 
-  // Connection state → activity log, naming the server it's talking to.
+  // Diagnostic: on each (re)connect, report the PREVIOUS link's close code +
+  // how long it lived — surfaced in the server console as `link = …`. A short
+  // lifetime + code 1006 points to the socket being dropped (proxy/network);
+  // this is how we tell a real drop from a one-off.
+  let connectedAt = 0;
+  let prevClose = '';
+  // App-level keepalive: regular traffic keeps a proxy (tailscale serve) from
+  // treating the socket as idle and closing it. `__`-prefixed status fields are
+  // NOT logged by the server (see webrtc_server.py) — they just keep it warm.
+  let keepaliveSeq = 0;
+  const KEEPALIVE_MS = 15000;
+
   signaling.on('connected', () => {
     uiLog.push(`● connected to ${serverHost}`);
+    connectedAt = performance.now();
     sentStatus = {}; // (re)connect → resend the full current state
     flushStatus();
+    if (prevClose) {
+      sendStatus('link', prevClose);
+      prevClose = '';
+    }
   });
-  signaling.on('disconnected', (code) =>
-    uiLog.push(`● disconnected from ${serverHost} (code ${code}) — retrying`),
-  );
+  signaling.on('disconnected', (code) => {
+    const lifetimeMs = connectedAt ? Math.round(performance.now() - connectedAt) : 0;
+    connectedAt = 0;
+    prevClose = `closed code ${code} after ${lifetimeMs}ms`;
+    uiLog.push(`● disconnected from ${serverHost} (code ${code}, up ${lifetimeMs}ms) — retrying`);
+  });
+
+  setInterval(() => {
+    if (signaling.isConnected) {
+      signaling.send({ type: 'status', field: '__keepalive', value: String(++keepaliveSeq) });
+    }
+  }, KEEPALIVE_MS);
 
   // The -iwsdk shim uses minimal structural contracts (it never imports
   // @iwsdk/core), so we bridge the concrete IWSDK types here: `createSystem` and

@@ -24,6 +24,13 @@ export interface SignalingConfig {
 const DEFAULT_BACKOFF = [1000, 2000, 4000, 8000] as const;
 
 /**
+ * WebSocket close code the server sends when its connection cap evicts this
+ * session in favour of a newer one (see `webrtc_server.py` `_enforce_connection_cap`).
+ * We deliberately do NOT reconnect on this — see the onclose handler.
+ */
+const SUPERSEDED_CLOSE_CODE = 4000;
+
+/**
  * WebSocket signaling transport. Speaks `webrtc_server.py`'s JSON protocol:
  * sends `offer`/`candidate`, receives `answer`/`candidate`. Reconnects with
  * bounded exponential backoff.
@@ -111,6 +118,14 @@ export class SignalingService
         this.socket = undefined;
         log.info(`Disconnected (code ${event.code})`);
         this.emit('disconnected', event.code);
+        // 4000 = the server's connection cap superseded us with a NEWER
+        // connection. Reconnecting would just supersede that one back — an
+        // endless "who's connected" war between overlapping clients/tabs. Stay
+        // down; the newest connection wins. (Reload to deliberately take over.)
+        if (event.code === SUPERSEDED_CLOSE_CODE) {
+          log.warn('Superseded by a newer connection — not reconnecting.');
+          return;
+        }
         if (!this.closedByUser) this.scheduleReconnect();
       };
     });
