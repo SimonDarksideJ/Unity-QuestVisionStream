@@ -127,6 +127,82 @@ export function createTextSprite(text: string, color = '#00e5ff'): THREE.Sprite 
   return sprite;
 }
 
+// --- Head-locked status HUD: a multi-line panel + a connection dot ----------
+
+const PANEL_FONT = 40; // px on the canvas; the world scale below is what sets on-headset size
+const PANEL_PAD = 20;
+const PANEL_LINE_HEIGHT = 1.4;
+/** World height per text line — half the single-tag label height (0.06). */
+const PANEL_LINE_WORLD = 0.03;
+
+export const STATUS_GREEN = '#39d353';
+export const STATUS_RED = '#ff5b52';
+
+function renderPanelCanvas(lines: readonly string[], color: string): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+  const rows = lines.length ? lines : [' '];
+  ctx.font = `${PANEL_FONT}px sans-serif`;
+  const widest = Math.max(1, ...rows.map((l) => ctx.measureText(l).width));
+  const lineH = PANEL_FONT * PANEL_LINE_HEIGHT;
+  canvas.width = Math.ceil(widest + PANEL_PAD * 2);
+  canvas.height = Math.ceil(rows.length * lineH + PANEL_PAD * 2);
+
+  ctx.font = `${PANEL_FONT}px sans-serif`;
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(8, 12, 20, 0.6)';
+  roundRect(ctx, 0, 0, canvas.width, canvas.height, 18);
+  ctx.fill();
+  ctx.fillStyle = color;
+  rows.forEach((line, i) => ctx.fillText(line, PANEL_PAD, PANEL_PAD + i * lineH));
+  return canvas;
+}
+
+function applyPanelScale(sprite: THREE.Sprite, canvas: HTMLCanvasElement, rows: number): void {
+  const worldH = Math.max(1, rows) * PANEL_LINE_WORLD + PANEL_LINE_WORLD * 0.6;
+  const aspect = canvas.height > 0 ? canvas.width / canvas.height : 1;
+  sprite.scale.set(aspect * worldH, worldH, 1);
+}
+
+/**
+ * A translucent multi-line status panel. Anchored **top-left** (`center = (0,1)`)
+ * so it grows rightward and **downward** as lines are added — a fixed corner
+ * that expands vertically. Update it in place with {@link setTextPanel}.
+ */
+export function createTextPanel(lines: readonly string[], color = '#e8f0f8'): THREE.Sprite {
+  const canvas = renderPanelCanvas(lines, color);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+  sprite.center.set(0, 1);
+  applyPanelScale(sprite, canvas, lines.length);
+  return sprite;
+}
+
+/** Re-render a panel's text in place (disposes the old texture — no leak). */
+export function setTextPanel(sprite: THREE.Sprite, lines: readonly string[], color = '#e8f0f8'): void {
+  const canvas = renderPanelCanvas(lines, color);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  sprite.material.map?.dispose();
+  sprite.material.map = texture;
+  sprite.material.needsUpdate = true;
+  applyPanelScale(sprite, canvas, lines.length);
+}
+
+/**
+ * A small solid-colour status dot (a mapless {@link THREE.Sprite}, so it's a
+ * flat billboarded quad tinted by its material colour). Recolour with
+ * `dot.material.color.set(hex)` — cheap, no texture churn.
+ */
+export function createStatusDot(colorHex = STATUS_RED): THREE.Sprite {
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ color: new THREE.Color(colorHex), transparent: true }),
+  );
+  sprite.scale.set(0.035, 0.035, 1);
+  return sprite;
+}
+
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,

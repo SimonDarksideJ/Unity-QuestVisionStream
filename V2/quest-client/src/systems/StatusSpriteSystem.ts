@@ -1,24 +1,40 @@
 import { createSystem } from '@iwsdk/core';
 import * as THREE from 'three';
-import { createTextSprite, disposeTagObject, setTagLabel } from '../rendering/TagFactory';
+import {
+  createStatusDot,
+  createTextPanel,
+  disposeTagObject,
+  setTextPanel,
+  STATUS_GREEN,
+  STATUS_RED,
+} from '../rendering/TagFactory';
 import { status as appStatus, type StatusModel } from '../ui/status';
 
-/** Head-relative HUD placement: slightly below the gaze line, ~1m out. */
-const HUD_OFFSET = new THREE.Vector3(0, -0.18, -1.0);
+/** Head-relative placement (metres, at ~1 m out). Tune on-device if needed. */
+const PANEL_POS = new THREE.Vector3(-0.42, 0.24, -1.0); // top-left, grows down
+const DOT_POS = new THREE.Vector3(0.46, 0.3, -1.0); // top-right
 
 /**
- * In-AR rendering of the {@link StatusModel}: the DOM status panel is not
- * visible inside an immersive session, so this system parents a text sprite
- * to the persistent player head entity (`world.playerHeadEntity`, verified in
- * the installed @iwsdk/core 0.4.2 typings) showing the current headline. It
- * hides itself when the model reports healthy, and re-renders only when the
- * headline actually changes.
+ * In-AR rendering of the {@link StatusModel}: the DOM status panel and activity
+ * log are invisible inside an immersive session, so this system parents a HUD to
+ * the persistent player head entity (`world.playerHeadEntity`, verified in the
+ * installed @iwsdk/core 0.4.2 typings). The HUD is two head-locked pieces:
+ *
+ *  - a **fixed multi-line panel** (half the old label text size) that expands
+ *    vertically as status lines populate, and
+ *  - a small **green/red connection dot** in the top-right — green once the
+ *    WebRTC path is up, red otherwise — for an at-a-glance "am I connected?".
+ *
+ * Both re-render only when their inputs actually change.
  */
 export class StatusSpriteSystem extends createSystem({}) {
   /** Injectable for tests; defaults to the app-wide model. */
   private model: StatusModel = appStatus;
   private hud: THREE.Group | undefined;
-  private lastHeadline: string | null = null;
+  private panel: THREE.Sprite | undefined;
+  private dot: THREE.Sprite | undefined;
+  private lastLines = '';
+  private lastConnected: boolean | undefined;
   private unsub: (() => void) | undefined;
 
   override init(): void {
@@ -28,23 +44,40 @@ export class StatusSpriteSystem extends createSystem({}) {
     if (!head) return; // no head rig (e.g. before XR) — nothing to attach to
 
     const hud = new THREE.Group();
-    hud.add(createTextSprite(this.model.headline() ?? ''));
-    hud.position.copy(HUD_OFFSET);
+
+    const panel = createTextPanel(this.model.panelLines());
+    panel.position.copy(PANEL_POS);
+    hud.add(panel);
+
+    const dot = createStatusDot(STATUS_RED);
+    dot.position.copy(DOT_POS);
+    hud.add(dot);
+
     head.add(hud);
     this.hud = hud;
+    this.panel = panel;
+    this.dot = dot;
 
     this.apply();
     this.unsub = this.model.onChange(() => this.apply());
   }
 
   private apply(): void {
-    if (!this.hud) return;
-    const headline = this.model.headline();
-    this.hud.visible = headline !== null;
-    if (headline !== null && headline !== this.lastHeadline) {
-      setTagLabel(this.hud, headline);
+    if (this.panel) {
+      const lines = this.model.panelLines();
+      const joined = lines.join('\n');
+      if (joined !== this.lastLines) {
+        setTextPanel(this.panel, lines);
+        this.lastLines = joined;
+      }
     }
-    this.lastHeadline = headline;
+    if (this.dot) {
+      const connected = this.model.isConnected();
+      if (connected !== this.lastConnected) {
+        this.dot.material.color.set(connected ? STATUS_GREEN : STATUS_RED);
+        this.lastConnected = connected;
+      }
+    }
   }
 
   override destroy(): void {
@@ -53,6 +86,8 @@ export class StatusSpriteSystem extends createSystem({}) {
       this.hud.parent?.remove(this.hud);
       disposeTagObject(this.hud);
       this.hud = undefined;
+      this.panel = undefined;
+      this.dot = undefined;
     }
   }
 }

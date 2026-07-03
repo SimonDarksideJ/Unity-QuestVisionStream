@@ -1,8 +1,8 @@
 /**
- * StatusSpriteSystem (new): the in-AR rendering of the StatusModel — the DOM
- * status panel is invisible inside an immersive session, so a head-locked
- * text sprite (parented to the persistent player head entity) shows the
- * current headline while anything needs attention, and hides when healthy.
+ * StatusSpriteSystem: the in-AR rendering of the StatusModel — the DOM status
+ * panel is invisible inside an immersive session, so a head-locked HUD (a fixed
+ * multi-line status panel + a green/red connection dot), parented to the
+ * persistent player head entity, shows status on-headset.
  */
 import * as THREE from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -77,53 +77,61 @@ describe('StatusSpriteSystem', () => {
     // fresh model per test via makeSystem
   });
 
-  it('parents a sprite to the player head and shows the current headline', () => {
+  /** The panel is the sprite with a texture map; the dot is the mapless one. */
+  const findPanel = (hud: THREE.Object3D) =>
+    hud.children.find((c) => c instanceof THREE.Sprite && (c as THREE.Sprite).material.map) as
+      | THREE.Sprite
+      | undefined;
+  const findDot = (hud: THREE.Object3D) =>
+    hud.children.find((c) => c instanceof THREE.Sprite && !(c as THREE.Sprite).material.map) as
+      | THREE.Sprite
+      | undefined;
+
+  it('parents a status panel and a connection dot to the player head', () => {
     const model = new StatusModel();
     model.set('connection', 'connecting');
     const { head } = makeSystem(model);
 
     const hud = head.children[0];
     expect(hud).toBeDefined();
-    const sprite = hud!.children.find((c) => c instanceof THREE.Sprite);
-    expect(sprite).toBeDefined();
-    expect(hud!.visible).toBe(true);
+    const sprites = hud!.children.filter((c) => c instanceof THREE.Sprite);
+    expect(sprites).toHaveLength(2); // panel + dot
+    expect(findPanel(hud!)).toBeDefined();
+    expect(findDot(hud!)).toBeDefined();
+    expect(hud!.visible).toBe(true); // fixed panel — always shown
   });
 
-  it('hides when the model reports healthy and reappears on failure', () => {
+  it('turns the connection dot green when connected, red otherwise', () => {
     const model = new StatusModel();
     model.set('connection', 'connecting');
     const { head } = makeSystem(model);
-    const hud = head.children[0]!;
+    const dot = findDot(head.children[0]!)!;
 
     model.set('connection', 'ready');
-    expect(hud.visible).toBe(false);
+    expect(dot.material.color.getHexString()).toBe('39d353'); // green
 
     model.set('connection', 'failed');
-    expect(hud.visible).toBe(true);
+    expect(dot.material.color.getHexString()).toBe('ff5b52'); // red
   });
 
-  it('updates the sprite texture when the headline changes', () => {
+  it('re-renders the panel texture when a status line changes', () => {
     const model = new StatusModel();
     model.set('connection', 'connecting');
     const { head } = makeSystem(model);
-    const sprite = head.children[0]!.children.find(
-      (c) => c instanceof THREE.Sprite,
-    ) as THREE.Sprite;
-    const before = sprite.material.map;
+    const panel = findPanel(head.children[0]!)!;
+    const before = panel.material.map;
 
     model.set('connection', 'failed');
-    expect(sprite.material.map).not.toBe(before); // re-rendered label
+    expect(panel.material.map).not.toBe(before); // re-rendered panel
   });
 
   it('detaches and disposes on destroy', () => {
     const model = new StatusModel();
     model.set('connection', 'connecting');
     const { system, head } = makeSystem(model);
-    const sprite = head.children[0]!.children.find(
-      (c) => c instanceof THREE.Sprite,
-    ) as THREE.Sprite;
+    const panel = findPanel(head.children[0]!)!;
     const textureDisposed = vi.fn();
-    sprite.material.map!.addEventListener('dispose', textureDisposed);
+    panel.material.map!.addEventListener('dispose', textureDisposed);
 
     system.destroy();
 

@@ -125,6 +125,28 @@ export class StatusModel {
     return null;
   }
 
+  /** True when the WebRTC path is up (data/media flowing) — drives the HUD dot. */
+  isConnected(): boolean {
+    const connection = this.fields.get('connection');
+    return connection === 'connected' || connection === 'ready';
+  }
+
+  /**
+   * Compact status lines for the in-AR panel: the full field list, but with the
+   * `server` value shortened to its host (the raw ws(s):// URL is too wide).
+   */
+  panelLines(): string[] {
+    return this.lines().map((line) => {
+      if (!line.startsWith('server: ')) return line;
+      const value = line.slice('server: '.length);
+      try {
+        return `server: ${new URL(value).host || value}`;
+      } catch {
+        return line;
+      }
+    });
+  }
+
   reset(): void {
     this.fields.clear();
     for (const listener of this.listeners) listener();
@@ -158,18 +180,16 @@ export function wireStatusServices(model: StatusModel, services: StatusServices)
   const unsubs: Array<() => void> = [];
 
   if (services.signaling) {
-    unsubs.push(
-      services.signaling.on('connected', () =>
-        model.set('signaling', `connected → ${hostOf(model.get('server'))}`),
-      ),
-    );
+    // The connected host is already shown by the `server` field (and the uiLog),
+    // so keep this field terse.
+    unsubs.push(services.signaling.on('connected', () => model.set('signaling', 'connected')));
     unsubs.push(
       services.signaling.on('disconnected', (code) =>
-        // Include the target host + a decoded cause so the AR HUD says *what*
-        // it can't reach and *why*, not just an opaque number.
+        // Name the target host + decode the cause AND keep the raw code, so the
+        // AR HUD says *what* it can't reach and *why* — not just an opaque number.
         model.set(
           'signaling',
-          `can't reach ${hostOf(model.get('server'))} — ${describeCloseCode(code)} — retrying`,
+          `can't reach ${hostOf(model.get('server'))} — ${describeCloseCode(code)} (code ${code}) — retrying`,
         ),
       ),
     );

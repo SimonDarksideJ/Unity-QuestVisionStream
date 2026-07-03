@@ -1,10 +1,11 @@
 /**
- * DetectionRenderSystem: capture-pose placement (C3 — tags must be placed
+ * DetectionRenderSystem: capture-pose placement (C3 — boxes must be placed
  * against the camera pose from ~capture time, not the pose at reply arrival),
- * tag lifecycle/disposal, and dedup baselines.
+ * box lifecycle/disposal, and per-frame (ephemeral) redraw behaviour.
  */
 import * as THREE from 'three';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toRenderBatch } from '@questvisionstream/client';
 
 vi.mock('@iwsdk/core', () => {
   class SystemBase {
@@ -82,7 +83,7 @@ afterEach(() => {
 });
 
 describe('capture-pose placement (C3)', () => {
-  it('places against the pose from ~capture time, not the arrival-time pose', async () => {
+  it('places the box against the pose from ~capture time, not the arrival-time pose', async () => {
     vi.useFakeTimers({ toFake: ['performance', 'setTimeout', 'Date'] });
     const camera = makeCamera();
     const { system, detection, scene } = makeSystem(camera);
@@ -90,12 +91,22 @@ describe('capture-pose placement (C3)', () => {
     // Capture-time pose: looking straight ahead from x=0.
     poseCamera(camera, 0, 0);
     system.update();
+
+    // What a correct capture-pose placement yields: the four box corners
+    // unprojected through a reference camera posed identically to capture time.
     const reference = makeCamera();
     poseCamera(reference, 0, 0);
-    const expected = expectedPlacement(reference, 0.5, 0.5);
+    const { x, y, w, h } = toRenderBatch(payload() as never, { invertY: AppConfig.invertY })
+      .detections[0]!.rect;
+    const expectedCorners = [
+      { x, y },
+      { x: x + w, y },
+      { x: x + w, y: y + h },
+      { x, y: y + h },
+    ].map((p) => expectedPlacement(reference, p.x, p.y));
 
-    // Round-trip latency elapses; the head has moved substantially by the
-    // time the server's detections arrive.
+    // Round-trip latency elapses; the head has moved substantially by the time
+    // the server's detections arrive. Placement must ignore this arrival pose.
     await vi.advanceTimersByTimeAsync(200);
     poseCamera(camera, 1, 0.8);
     system.update();
@@ -103,8 +114,15 @@ describe('capture-pose placement (C3)', () => {
     detection.emit('detections', payload());
 
     expect(scene.children).toHaveLength(1);
-    const placed = scene.children[0]!.position;
-    expect(placed.distanceTo(expected)).toBeLessThan(1e-6);
+    const outline = scene.children[0]!.children.find(
+      (c) => c instanceof THREE.LineLoop,
+    ) as THREE.LineLoop;
+    const positions = outline.geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(positions.count).toBe(4);
+    for (let i = 0; i < 4; i++) {
+      const corner = new THREE.Vector3().fromBufferAttribute(positions, i);
+      expect(corner.distanceTo(expectedCorners[i]!)).toBeLessThan(1e-6);
+    }
   });
 });
 
@@ -151,24 +169,41 @@ describe('recenter cleanup', () => {
     referenceSpace.dispatch('reset');
 
     expect(scene.children).toHaveLength(0);
-    detection.emit('detections', payload('cup')); // dedup must be reset too
+    detection.emit('detections', payload('cup')); // next frame redraws cleanly
     expect(scene.children).toHaveLength(1);
   });
 });
 
-describe('tag lifecycle baselines', () => {
-  it('per-class dedup places one tag per label', () => {
+describe('box lifecycle baselines', () => {
+  it('redraws per frame (ephemeral): each payload replaces the previous boxes', () => {
     const camera = makeCamera();
-    const { system, detection, scene } = makeSystem(camera);
+    const { detection, scene } = makeSystem(camera);
 
     detection.emit('detections', payload('cup'));
-    detection.emit('detections', payload('cup'));
-    detection.emit('detections', payload('plant'));
+    expect(scene.children).toHaveLength(1);
 
-    expect(scene.children).toHaveLength(2);
+    // A new frame REPLACES the previous boxes (no cross-frame accumulation or
+    // dedup) — the scene always shows "what's seen right now".
+    detection.emit('detections', payload('cup'));
+    expect(scene.children).toHaveLength(1);
+
+    // Every detection in a frame gets its own box — including two of the same
+    // class (no per-class dedup).
+    detection.emit('detections', {
+      type: 'detections',
+      frame: 2,
+      width: 640,
+      height: 480,
+      detections: [
+        { label: 'cup', conf: 0.9, bbox: [300, 200, 340, 280] },
+        { label: 'cup', conf: 0.8, bbox: [10, 10, 60, 70] },
+        { label: 'plant', conf: 0.7, bbox: [100, 100, 150, 170] },
+      ],
+    });
+    expect(scene.children).toHaveLength(3);
   });
 
-  it('clear() empties the scene, disposes GPU textures, and resets dedup', () => {
+  it('clear() empties the scene and disposes GPU textures', () => {
     const camera = makeCamera();
     const { system, detection, scene } = makeSystem(camera);
 
@@ -183,7 +218,7 @@ describe('tag lifecycle baselines', () => {
 
     expect(scene.children).toHaveLength(0);
     expect(textureDisposed).toHaveBeenCalledTimes(1); // C4: the leaked CanvasTexture
-    detection.emit('detections', payload('cup')); // dedup was reset
+    detection.emit('detections', payload('cup')); // redraws after a clear
     expect(scene.children).toHaveLength(1);
   });
 });
