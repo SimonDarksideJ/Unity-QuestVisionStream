@@ -94,6 +94,15 @@ def _client_ident(websocket) -> str:
     return "unknown"
 
 
+def _client_cid(websocket) -> str:
+    """The client's per-page connection id (``?cid=`` on the WS URL), if any.
+
+    Lets the server tell a **reconnect of the same page** (clean replace) from a
+    **genuinely different client** (connection cap). Empty when absent."""
+    query = parse_qs(urlparse(_request_path(websocket)).query)
+    return query.get("cid", [""])[0]
+
+
 def _parse_signaling_message(raw) -> Optional[dict]:
     """Decode one signaling message; None if it isn't a typed JSON object."""
     try:
@@ -114,8 +123,8 @@ class WebRTCServer:
         # stream — which the connection cap enforces by default.
         self.make_processor = make_processor
         self.pcs: set[RTCPeerConnection] = set()
-        # Oldest-first (websocket, pc) pairs for cap enforcement/eviction.
-        self.sessions: list[tuple[object, RTCPeerConnection]] = []
+        # Oldest-first (websocket, pc, cid) tuples for reconnect-replace + cap.
+        self.sessions: list[tuple[object, RTCPeerConnection, str]] = []
 
     # ------------------------------------------------------------ gating ----
 
@@ -132,21 +141,37 @@ class WebRTCServer:
         origin = _request_origin(websocket)
         return origin in self.config.allowed_origins
 
-    async def _enforce_connection_cap(self) -> None:
-        """A new connection at the cap supersedes the oldest live session —
-        right for a single-headset server where the old socket may linger
-        half-open (e.g. headset slept mid-session)."""
+    async def _close_session(self, old_ws, old_pc, code: int, reason: str) -> None:
+        try:
+            await old_ws.close(code, reason)
+        except Exception as exc:
+            print(f"[WebRTC] Error closing socket: {exc}")
+        try:
+            await old_pc.close()
+        except Exception as exc:
+            print(f"[WebRTC] Error closing pc: {exc}")
+
+    async def _admit(self, cid: str) -> None:
+        """Decide what to close before admitting a new connection.
+
+        1. **Reconnect of the same page** (matching ``cid``): retire its prior,
+           possibly half-open session — a clean *replace*, not a supersede war.
+           (This is the fix for a socket that flaps through a proxy: the new
+           connection cleanly takes over instead of the server evicting a live
+           session and the client reconnecting forever.)
+        2. **Genuinely different clients** still over the cap: supersede the
+           oldest (close 4000), as before.
+        """
+        if cid:
+            stale = [s for s in self.sessions if s[2] == cid]
+            for old in stale:
+                self.sessions.remove(old)
+                print(f"[QVS] Reconnect — replacing prior session for client {cid[:8]}")
+                await self._close_session(old[0], old[1], 4001, "replaced by reconnect")
         while len(self.sessions) >= self.config.max_connections:
-            old_ws, old_pc = self.sessions.pop(0)
+            old_ws, old_pc, _ = self.sessions.pop(0)
             print("[WebRTC] Connection cap reached — superseding oldest session")
-            try:
-                await old_ws.close(4000, "superseded by a newer connection")
-            except Exception as exc:
-                print(f"[WebRTC] Error closing superseded socket: {exc}")
-            try:
-                await old_pc.close()
-            except Exception as exc:
-                print(f"[WebRTC] Error closing superseded pc: {exc}")
+            await self._close_session(old_ws, old_pc, 4000, "superseded by a newer connection")
 
     # ----------------------------------------------------------- session ----
 
@@ -159,13 +184,14 @@ class WebRTCServer:
             print(f"[WebRTC] Rejected connection: origin {_request_origin(websocket)!r} not allowed")
             await websocket.close(4403, "origin not allowed")
             return
-        await self._enforce_connection_cap()
+        cid = _client_cid(websocket)
+        await self._admit(cid)
 
         client = _client_ident(websocket)
         print(f"[QVS] Client connected: {client}")
         pc = RTCPeerConnection(RTCConfiguration(iceServers=_build_ice_servers(self.config)))
         self.pcs.add(pc)
-        session = (websocket, pc)
+        session = (websocket, pc, cid)
         self.sessions.append(session)
 
         processor: VideoProcessor = self.make_processor()
@@ -260,7 +286,13 @@ class WebRTCServer:
                 except Exception as exc:
                     print(f"[WebRTC] Error handling '{data['type']}' message: {exc}")
         except websockets.ConnectionClosed:
-            print(f"[QVS] Client disconnected: {client}")
+            # Log what the SERVER observed, so we can tell who closed it:
+            #  - close_code 1011        → the server's own ping-timeout closed it
+            #  - 1000/1001 (clean)      → the client/proxy closed deliberately
+            #  - 1006 / None (abrupt)   → the transport dropped (no close frame)
+            code = getattr(websocket, "close_code", None)
+            reason = getattr(websocket, "close_reason", None)
+            print(f"[QVS] Client disconnected: {client} (server saw close_code={code} reason={reason!r})")
         except Exception as exc:
             print(f"[WebRTC] Session error: {exc}")
         finally:

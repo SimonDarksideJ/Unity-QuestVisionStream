@@ -28,6 +28,17 @@ function hostOf(url: string): string {
   }
 }
 
+/** Append a `?cid=` query param (stable per page load) to the signaling URL. */
+function withConnectionId(url: string, cid: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set('cid', cid);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 /**
  * Wire the flat-page welcome screen. "Enter XR" is enabled only once BOTH
  * immersive AR is available AND the signaling socket is connected (the socket
@@ -139,6 +150,13 @@ function wireIntro(world: World, signaling: ISignalingService): void {
 async function bootstrap(): Promise<void> {
   const signalingUrl = await resolveSignalingUrl();
   const serverHost = hostOf(signalingUrl);
+  // Stable per-page connection id: lets the server treat a reconnect of THIS
+  // page as a clean replace rather than a second client tripping the cap.
+  const connectionId =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  const signalingUrlForProfile = withConnectionId(signalingUrl, connectionId);
   status.set('server', signalingUrl);
   const statusPanel = document.getElementById('status');
   if (statusPanel) bindStatusDom(status, statusPanel);
@@ -171,7 +189,7 @@ async function bootstrap(): Promise<void> {
   const { manager, adapter } = startServiceRuntime(world, (frameSource) =>
     createQuestVisionStreamProfile(
       'quest-vision-stream',
-      { signalingUrl, qualifier: { enabled: true }, logLevel: 'info' },
+      { signalingUrl: signalingUrlForProfile, qualifier: { enabled: true }, logLevel: 'info' },
       frameSource,
     ),
   );
@@ -228,8 +246,13 @@ async function bootstrap(): Promise<void> {
   signaling.on('disconnected', (code) => {
     const lifetimeMs = connectedAt ? Math.round(performance.now() - connectedAt) : 0;
     connectedAt = 0;
-    prevClose = `closed code ${code} after ${lifetimeMs}ms`;
-    uiLog.push(`● disconnected from ${serverHost} (code ${code}, up ${lifetimeMs}ms) — retrying`);
+    const info = signaling.lastCloseInfo;
+    const clean = info ? (info.wasClean ? 'clean' : 'abrupt') : '?';
+    const reason = info?.reason ? ` "${info.reason}"` : '';
+    // Reported to the SERVER console on the next connect (as `link = …`), so we
+    // can see who closed it: abrupt+1006 = transport drop; clean = deliberate.
+    prevClose = `code ${code} (${clean}${reason}) after ${lifetimeMs}ms`;
+    uiLog.push(`● disconnected from ${serverHost} (${prevClose}) — retrying`);
   });
 
   setInterval(() => {

@@ -4,6 +4,7 @@ import {
 } from '@realitycollective/service-framework';
 import { createLogger } from '../../util/logger';
 import type {
+  CloseInfo,
   ISignalingService,
   SignalingEventMap,
   SignalingInbound,
@@ -30,6 +31,9 @@ const DEFAULT_BACKOFF = [1000, 2000, 4000, 8000] as const;
  */
 const SUPERSEDED_CLOSE_CODE = 4000;
 
+/** Close code the server sends when OUR OWN reconnect replaces a prior session. */
+const REPLACED_CLOSE_CODE = 4001;
+
 /**
  * WebSocket signaling transport. Speaks `webrtc_server.py`'s JSON protocol:
  * sends `offer`/`candidate`, receives `answer`/`candidate`. Reconnects with
@@ -45,6 +49,7 @@ export class SignalingService
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private closedByUser = false;
+  private _lastCloseInfo: CloseInfo | undefined;
 
   constructor(context: ServiceActivationContext<SignalingConfig>) {
     super(context);
@@ -56,6 +61,10 @@ export class SignalingService
 
   get isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  get lastCloseInfo(): CloseInfo | undefined {
+    return this._lastCloseInfo;
   }
 
   override start(): void {
@@ -73,10 +82,19 @@ export class SignalingService
    */
   connect(): Promise<void> {
     this.closedByUser = false;
+    // We're connecting now — cancel any pending reconnect so it can't fire a
+    // second, overlapping socket later.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
     if (this.socket) {
       if (this.socket.readyState === WebSocket.OPEN) return Promise.resolve();
-      if (this.socket.readyState === WebSocket.CONNECTING && this.pendingOpen) {
-        return this.pendingOpen;
+      // Never open a SECOND socket while one is still CONNECTING — even if
+      // pendingOpen was cleared by an onerror that hasn't reached onclose yet
+      // (that window is exactly how overlapping connections were created).
+      if (this.socket.readyState === WebSocket.CONNECTING) {
+        return this.pendingOpen ?? Promise.resolve();
       }
     }
 
@@ -116,14 +134,23 @@ export class SignalingService
         // disconnect (and must not double-schedule reconnects).
         if (this.socket !== socket) return;
         this.socket = undefined;
-        log.info(`Disconnected (code ${event.code})`);
+        // Capture the full close picture — code + reason + wasClean is what tells
+        // us WHO closed it: wasClean=false + 1006 = the transport dropped it (no
+        // close frame); a clean code = the server/proxy closed deliberately.
+        this._lastCloseInfo = {
+          code: event.code,
+          reason: (event as CloseEvent).reason ?? '',
+          wasClean: (event as CloseEvent).wasClean ?? false,
+        };
+        log.warn(
+          `Disconnected: code=${event.code} clean=${this._lastCloseInfo.wasClean} reason=${JSON.stringify(this._lastCloseInfo.reason)}`,
+        );
         this.emit('disconnected', event.code);
-        // 4000 = the server's connection cap superseded us with a NEWER
-        // connection. Reconnecting would just supersede that one back — an
-        // endless "who's connected" war between overlapping clients/tabs. Stay
-        // down; the newest connection wins. (Reload to deliberately take over.)
-        if (event.code === SUPERSEDED_CLOSE_CODE) {
-          log.warn('Superseded by a newer connection — not reconnecting.');
+        // 4000 = superseded by a different client; 4001 = replaced by our own
+        // reconnect. Either way the server deliberately closed us in favour of
+        // another connection — reconnecting would just fight it. Stay down.
+        if (event.code === SUPERSEDED_CLOSE_CODE || event.code === REPLACED_CLOSE_CODE) {
+          log.warn(`Closed by server (code ${event.code}) — not reconnecting.`);
           return;
         }
         if (!this.closedByUser) this.scheduleReconnect();
@@ -172,12 +199,14 @@ export class SignalingService
   }
 
   private scheduleReconnect(): void {
+    if (this.reconnectTimer) return; // one reconnect in flight at a time — never stack
     const backoff = this.cfg.reconnectBackoffMs ?? DEFAULT_BACKOFF;
     if (backoff.length === 0) return;
     const delay = backoff[Math.min(this.reconnectAttempt, backoff.length - 1)]!;
     this.reconnectAttempt += 1;
     log.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`);
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
       void this.connect().catch(() => {
         /* onclose reschedules */
       });

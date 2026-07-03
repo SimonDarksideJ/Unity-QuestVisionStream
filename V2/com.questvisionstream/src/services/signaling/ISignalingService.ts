@@ -54,8 +54,20 @@ export type SignalingEventMap = {
  * WebSocket transport for the WebRTC handshake. A RealityCollective service:
  * lifecycle + events come from `BaseEventService`.
  */
+/** Details of the most recent socket close — for diagnosing *why* it dropped. */
+export interface CloseInfo {
+  /** WebSocket close code (1006 = abnormal/no close frame; 1000/1001 = clean). */
+  readonly code: number;
+  /** Close reason string, if any. */
+  readonly reason: string;
+  /** True only if a proper close handshake happened (a close frame was received). */
+  readonly wasClean: boolean;
+}
+
 export interface ISignalingService extends IEventService<SignalingEventMap> {
   readonly isConnected: boolean;
+  /** The most recent close, or undefined before the first disconnect. */
+  readonly lastCloseInfo?: CloseInfo;
   connect(): Promise<void>;
   disconnect(): void;
   send(message: SignalingOutbound): void;
