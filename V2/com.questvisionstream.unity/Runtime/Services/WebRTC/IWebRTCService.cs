@@ -53,6 +53,9 @@ namespace QuestVisionStream.Services
 
         event Action<WebRTCConnectionState> ConnectionStateChanged;
 
+        /// <summary>ICE connection state detail (CHECKING/CONNECTED/FAILED…) for diagnostics.</summary>
+        event Action<string> IceStateChanged;
+
         /// <summary>A text message arrived on the detections data channel.</summary>
         event Action<string> DataChannelMessageReceived;
 
@@ -93,10 +96,32 @@ namespace QuestVisionStream.Services
     {
         event Action<WebRTCConnectionState> StateChanged;
 
+        /// <summary>
+        /// Connection-progress detail ("offer sent", "answer received",
+        /// "ICE: CHECKING"…) — tells a status surface WHERE a connection is,
+        /// or where it died, rather than just that it failed.
+        /// </summary>
+        event Action<string> DiagnosticChanged;
+
         /// <summary>Raw text from the detections data channel (parsed by the detection service).</summary>
         event Action<string> DetectionMessageReceived;
 
         WebRTCConnectionState State { get; }
+
+        /// <summary>The most recent connection-progress detail.</summary>
+        string LastDiagnostic { get; }
+
+        /// <summary>
+        /// Has streaming been requested? True from the start when the profile's
+        /// AutoStartSession is on; otherwise false until <see cref="BeginStreaming"/>.
+        /// </summary>
+        bool StreamingRequested { get; }
+
+        /// <summary>
+        /// Request the streaming session (the warm-up screen's Start button). The
+        /// session still waits for camera Active + signaling connected.
+        /// </summary>
+        void BeginStreaming();
 
         /// <summary>Tear down and renegotiate now (also used internally for recovery).</summary>
         void RestartSession();

@@ -82,23 +82,39 @@ namespace QuestVisionStream.Client
                 return;
             }
 
-            if (!HasPermissions())
-            {
-                // Permission dialogs have no callback we can rely on across OS
-                // versions — poll, and give up into Error state only when the user
-                // actively denied (flagged by the callbacks below).
-                return;
-            }
-
             if (cameraManager == null)
             {
-                cameraManager = UnityEngine.Object.FindFirstObjectByType<ARCameraManager>();
+                cameraManager = UnityEngine.Object.FindFirstObjectByType<ARCameraManager>(FindObjectsInactive.Include);
                 if (cameraManager == null)
                 {
                     return; // rig not built yet
                 }
 
                 cameraManager.frameReceived += OnFrameReceived;
+            }
+
+            // FIRST-RUN FLAKINESS FIX: if the AR camera manager starts before
+            // HEADSET_CAMERA is granted, the provider comes up dead and never
+            // retries — first launch shows no images, second launch (permission
+            // already granted) works. Hold the manager disabled until permissions
+            // exist, then enable it for a clean provider start.
+            if (!HasPermissions())
+            {
+                if (cameraManager.enabled)
+                {
+                    Debug.Log("[QVS:MetaCamera] Holding AR camera manager disabled until camera permissions are granted");
+                    cameraManager.enabled = false;
+                }
+
+                // Permission dialogs have no reliable callback across OS versions —
+                // poll; the deny callback below moves us to Error.
+                return;
+            }
+
+            if (!cameraManager.enabled)
+            {
+                Debug.Log("[QVS:MetaCamera] Permissions granted — enabling AR camera manager");
+                cameraManager.enabled = true;
             }
 
             if (!configurationChosen)

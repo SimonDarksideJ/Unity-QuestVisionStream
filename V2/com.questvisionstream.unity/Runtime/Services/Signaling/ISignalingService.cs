@@ -50,6 +50,13 @@ namespace QuestVisionStream.Services
 
         bool IsConnected { get; }
 
+        /// <summary>
+        /// Log-safe display form of the server URL currently in use (resolved via
+        /// remote config or the profile fallback), for status surfaces. Null before
+        /// the first connection attempt.
+        /// </summary>
+        string CurrentServerDisplay { get; }
+
         /// <summary>The last close, if any — tells WHO closed the socket and why.</summary>
         SignalingCloseInfo? LastCloseInfo { get; }
 
