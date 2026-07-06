@@ -80,17 +80,30 @@ namespace QuestVisionStream.Client
 
         private void Awake()
         {
-            BuildCameraRig();
+            EnsureCameraRig();
 
-            var globalServiceManager = gameObject.AddComponent<GlobalServiceManager>();
+            // The GlobalServiceManager lives in the scene next to this component
+            // (added here only as a safety net for bare scenes).
+            var globalServiceManager = GetComponent<GlobalServiceManager>();
+            if (globalServiceManager == null)
+            {
+                globalServiceManager = gameObject.AddComponent<GlobalServiceManager>();
+            }
+
             globalServiceManager.InitializeServiceManager();
             serviceManager = globalServiceManager.Manager;
 
             // The manager only pumps Update/Start into services when it has an
-            // active profile — give it an empty one, then register code-first.
-            serviceManager.ResetProfile(
-                ScriptableObject.CreateInstance<RealityCollective.ServiceFramework.Definitions.ServiceProvidersProfile>(),
-                gameObject);
+            // active profile. When none is assigned in the scene, give it an empty
+            // one and register the graph code-first below. (To go fully
+            // asset-driven instead: assign a ServiceProvidersProfile on the
+            // GlobalServiceManager and disable this component.)
+            if (serviceManager.ActiveProfile == null)
+            {
+                serviceManager.ResetProfile(
+                    ScriptableObject.CreateInstance<RealityCollective.ServiceFramework.Definitions.ServiceProvidersProfile>(),
+                    gameObject);
+            }
 
             RegisterServices();
         }
@@ -132,11 +145,29 @@ namespace QuestVisionStream.Client
         }
 
         /// <summary>
-        /// XR Origin + camera (TrackedPoseDriver) + ARSession + ARCameraManager.
-        /// Built in code so the scene stays trivially small; the AR camera path is
-        /// what surfaces Meta passthrough camera frames under OpenXR — plain
-        /// WebCamTexture does not work on Quest 3.
+        /// The QuestVisionStream scene ships the full rig (XR Origin, tracked Main
+        /// Camera with ARCameraManager, AR Session) — the AR camera path is what
+        /// surfaces Meta passthrough camera frames under OpenXR; plain
+        /// WebCamTexture does not work on Quest 3. This method only builds the rig
+        /// when it is missing, so the component also works dropped into a bare scene.
         /// </summary>
+        private void EnsureCameraRig()
+        {
+            if (FindFirstObjectByType<ARSession>() == null)
+            {
+                var sessionObject = new GameObject("AR Session");
+                sessionObject.AddComponent<ARSession>();
+            }
+
+            if (FindFirstObjectByType<ARCameraManager>() != null)
+            {
+                return; // scene rig present — nothing to build
+            }
+
+            Debug.LogWarning("[QVS] No AR camera rig found in the scene — building one at runtime.");
+            BuildCameraRig();
+        }
+
         private void BuildCameraRig()
         {
             var originObject = new GameObject("XR Origin");
@@ -164,9 +195,6 @@ namespace QuestVisionStream.Client
             origin.CameraFloorOffsetObject = offsetObject;
             origin.Camera = camera;
             origin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Floor;
-
-            var sessionObject = new GameObject("AR Session");
-            sessionObject.AddComponent<ARSession>();
 
             // Enabling the AR Camera Manager is what turns passthrough on with the
             // Unity OpenXR Meta provider; it is also the CPU-image frame source.
