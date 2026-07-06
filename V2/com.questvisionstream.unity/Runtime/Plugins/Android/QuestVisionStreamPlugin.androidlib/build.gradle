@@ -1,0 +1,52 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+// Minimal WebRTC media plugin for QuestVisionStream V2.
+// Signaling moved to C# (com.utilities.websockets) — this library owns ONLY the
+// peer connection, the pixel-fed video track and the detections data channel.
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'io.github.webrtc-sdk:android:125.6422.06.1'
+}
+
+android {
+    namespace "com.questvisionstream"
+    compileSdk getProperty("unity.compileSdkVersion") as int
+    buildToolsVersion = getProperty("unity.buildToolsVersion")
+
+    compileOptions {
+        sourceCompatibility JavaVersion.valueOf(getProperty("unity.javaCompatabilityVersion"))
+        targetCompatibility JavaVersion.valueOf(getProperty("unity.javaCompatabilityVersion"))
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.valueOf(getProperty("unity.javaCompatabilityVersion"))
+    }
+
+    defaultConfig {
+        minSdk getProperty("unity.minSdkVersion") as int
+        targetSdk getProperty("unity.targetSdkVersion") as int
+
+        ndk {
+            abiFilters.addAll(getProperty("unity.abiFilters").tokenize(','))
+            debugSymbolLevel getProperty("unity.debugSymbolLevel")
+        }
+
+        versionCode getProperty("unity.versionCode") as int
+        versionName getProperty("unity.versionName")
+
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}

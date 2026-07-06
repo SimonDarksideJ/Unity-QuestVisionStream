@@ -13,6 +13,7 @@ The single hub for all V2 documentation. Everything below lives here under
 
 | Guide | What it covers |
 |-------|----------------|
+| [Unity-Client.md](Unity-Client.md) | **The V2 Quest client** (Unity 6, Quest 3/3S): Service Framework architecture, Meta passthrough camera access, transport decision, render modes, AprilTags, build steps. |
 | [Configuration-and-Connectivity.md](Configuration-and-Connectivity.md) | How the client is configured (which server it dials), the WebRTC connection sequence, ports, STUN/TURN, and a connectivity troubleshooting matrix. |
 | [Install-Mac-M2.md](Install-Mac-M2.md) | Run the server natively on a Mac mini M2 (macOS 26.5) using the GPU + full unified memory (MPS), and expose it externally (Tailscale / Cloudflare Tunnel / Caddy / router + TURN). |
 | [Quest-Headset-Setup.md](Quest-Headset-Setup.md) | Set up the **Meta Quest**: sideload the Tailscale APK (not in the Horizon Store), join the same tailnet, open the hosted client, and troubleshoot the on-headset status/connection. |

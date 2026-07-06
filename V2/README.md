@@ -4,17 +4,26 @@ A fresh rebuild of QuestVisionStream. The V1 tree (Unity project + Python server
 at the repo root) is left untouched and serves as **reference only**; all new work
 lives here under `V2/`.
 
+> **Direction change (2026-07):** Meta removed passthrough camera access from the
+> Horizon browser, killing the IWSDK WebXR client as a product. **The Quest client
+> is now a native Unity 6 app** (`Unity-Quest-Client` + the
+> `com.questvisionstream.unity` package). The web client and its TypeScript
+> library remain in the tree as the reference implementation their features were
+> ported from. The server is unchanged — one server serves every client.
+
 ## What's here
 
 ```
 V2/
-├── com.questvisionstream/    # @questvisionstream/client  (the reusable library)
-│                             #   Streaming client as RealityCollective Service
-│                             #   Framework services; file-linked into the client.
-├── quest-client/             # Meta IWSDK WebXR app (the new Quest client)
-│                             #   Thin host that wires the library into IWSDK's ECS.
-├── QuestVisionStreamServer/  # Modernized Python inference server.
-└── Documentation/            # Install + deployment guides (see below).
+├── com.questvisionstream.unity/  # THE reusable Unity client library (UPM package):
+│                                 #   Service Framework services + service modules;
+│                                 #   file-linked into Unity-Quest-Client.
+├── Unity-Quest-Client/           # The Quest 3/3S Unity app (the new Quest client).
+├── QuestVisionStreamServer/      # Modernized Python inference server.
+├── com.questvisionstream/        # (retired) @questvisionstream/client TS library.
+├── quest-client/                 # (retired) Meta IWSDK WebXR app — reference only.
+├── tools/                        # AprilTag print generator, Tailscale helpers.
+└── Documentation/                # Install + deployment guides (see below).
 ```
 
 The DI backbone is the **published** [`@realitycollective/service-framework`](https://www.npmjs.com/package/@realitycollective/service-framework)
@@ -25,11 +34,12 @@ bindings) pulled from npm — nothing for it is vendored in this repo. Only
 ## Documentation
 
 📖 **All documentation lives in one hub: [`Documentation/`](Documentation/README.md).**
-Start with [Architecture-and-Hosting](Documentation/Architecture-and-Hosting.md), then
-[Configuration-and-Connectivity](Documentation/Configuration-and-Connectivity.md),
-[Install-Mac-M2](Documentation/Install-Mac-M2.md) (server hosting) and
-[Deployment-Cloudflare-Pages](Documentation/Deployment-Cloudflare-Pages.md) (client
-hosting). Each component package keeps only a short README that links back to the hub.
+Start with **[Unity-Client](Documentation/Unity-Client.md)** (the new Quest client:
+architecture, camera access, protocol, build), then
+[Architecture-and-Hosting](Documentation/Architecture-and-Hosting.md),
+[Configuration-and-Connectivity](Documentation/Configuration-and-Connectivity.md) and
+[Install-Mac-M2](Documentation/Install-Mac-M2.md) (server hosting). Each component
+package keeps only a short README that links back to the hub.
 
 Two "app" folders as requested — the **Quest client** and the updated
 **QuestVisionStreamServer** — plus the reusable **`com.questvisionstream`** library

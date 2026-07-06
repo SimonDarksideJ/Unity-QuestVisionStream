@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "com.meta.xr.sdk.core": "203.0.0",
+    "com.questvisionstream.unity": "file:../../com.questvisionstream.unity",
     "com.realitycollective.service-framework": "2.0.0-pre.1",
     "com.unity.ai.navigation": "2.0.11",
     "com.unity.ide.rider": "3.0.39",
@@ -12,11 +13,12 @@
     "com.unity.timeline": "1.8.11",
     "com.unity.ugui": "2.0.0",
     "com.unity.visualscripting": "1.9.10",
-    "com.unity.webrtc": "3.0.0",
+    "com.unity.xr.arfoundation": "6.5.0",
     "com.unity.xr.management": "4.6.0",
     "com.unity.xr.meta-openxr": "2.5.0",
     "com.unity.xr.openxr": "1.16.1",
     "com.utilities.websockets": "2.0.0",
+    "jp.keijiro.apriltag": "1.0.3",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
@@ -61,7 +63,8 @@
         "com.realitycollective.utilities",
         "com.utilities.async",
         "com.utilities.extensions",
-        "com.utilities.websockets"
+        "com.utilities.websockets",
+        "jp.keijiro.apriltag"
       ]
     }
   ]
