@@ -88,11 +88,14 @@ namespace QuestVisionStream.Services
             }
         }
 
+        private bool firstDrawLogged;
+
         /// <inheritdoc />
         public void RenderDetections(DetectionArrival arrival, CameraPoseSnapshot? capturePose)
         {
             if (!IsActiveRenderer)
             {
+                Debug.LogWarning($"[WSDetection] frame={arrival.Batch.Frame} NOT drawn — '{Name}' received a batch while inactive");
                 return;
             }
 
@@ -102,6 +105,12 @@ namespace QuestVisionStream.Services
             {
                 HideFrom(0);
                 return;
+            }
+
+            if (!firstDrawLogged && arrival.Batch.Detections.Count > 0)
+            {
+                firstDrawLogged = true;
+                Debug.Log($"[WSDetection] first boxes drawn (frame={arrival.Batch.Frame}, count={arrival.Batch.Detections.Count}, distance={profile.PlacementDistanceMeters}m)");
             }
 
             EnsureContainer();

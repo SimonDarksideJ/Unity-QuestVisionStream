@@ -150,22 +150,21 @@ namespace QuestVisionStream.Services
         }
 
         /// <inheritdoc />
-        public void PushFrameYuv(byte[] y, byte[] u, byte[] v, int width, int height)
+        public void PushFrameYuv(sbyte[] y, sbyte[] u, sbyte[] v, int width, int height)
         {
 #if UNITY_ANDROID
-            // Kotlin ByteArray marshals as sbyte[]; passing byte[] would hit Unity's
-            // obsolete-signature reflection path and log a warning EVERY frame.
-            // The cast reinterprets the same array — no copy.
-            plugin?.Call("updateFrameDataYUV",
-                (sbyte[])(Array)y, (sbyte[])(Array)u, (sbyte[])(Array)v, width, height);
+            // Genuine sbyte[] all the way from the GPU readback: Unity's JNI helper
+            // reflects on the RUNTIME array type, so only a real sbyte[] avoids the
+            // obsolete-signature path (a reinterpret-cast byte[] does not).
+            plugin?.Call("updateFrameDataYUV", y, u, v, width, height);
 #endif
         }
 
         /// <inheritdoc />
-        public void PushFrameRgb(byte[] rgb, int width, int height)
+        public void PushFrameRgb(sbyte[] rgb, int width, int height)
         {
 #if UNITY_ANDROID
-            plugin?.Call("updateFrameData", (sbyte[])(Array)rgb, width, height);
+            plugin?.Call("updateFrameData", rgb, width, height);
 #endif
         }
 
@@ -240,7 +239,12 @@ namespace QuestVisionStream.Services
                     break;
 
                 case "dcMessage":
-                    DataChannelMessageReceived?.Invoke(root.Value<string>("message"));
+                    var message = root.Value<string>("message");
+                    // Raw receipt marker: if [WSDetection] logs stop HERE, the channel
+                    // is delivering but parsing/rendering is failing downstream; if this
+                    // never appears, the server isn't sending (or the channel is closed).
+                    Debug.Log($"[WSDetection] dc message received ({message?.Length ?? 0} chars)");
+                    DataChannelMessageReceived?.Invoke(message);
                     break;
 
                 case "dcState":

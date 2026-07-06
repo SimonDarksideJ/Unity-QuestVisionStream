@@ -155,10 +155,20 @@ namespace QuestVisionStream.Services
         {
             if (activeModule == null)
             {
+                Debug.LogWarning($"[WSDetection] frame={arrival.Batch.Frame} NOT drawn — no active render module");
                 return;
             }
 
             var capturePose = poseTracking.SnapshotForArrival(arrival.ArrivalTimeMs);
+            if (!capturePose.HasValue)
+            {
+                Debug.LogWarning($"[WSDetection] frame={arrival.Batch.Frame} NOT drawn — no capture pose recorded yet (is Camera.main present and the pose service ticking?)");
+            }
+            else
+            {
+                Debug.Log($"[WSDetection] draw frame={arrival.Batch.Frame} count={arrival.Batch.Detections.Count} module='{activeModule.Name}' latency={poseTracking.EstimatedLatencyMs:0}ms");
+            }
+
             activeModule.RenderDetections(arrival, capturePose);
         }
 

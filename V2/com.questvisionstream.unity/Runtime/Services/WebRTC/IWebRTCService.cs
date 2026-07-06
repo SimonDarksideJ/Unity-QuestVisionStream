@@ -73,11 +73,17 @@ namespace QuestVisionStream.Services
 
         void AddRemoteCandidate(IceCandidateMessage candidate);
 
-        /// <summary>Push one planar I420 frame into the video track.</summary>
-        void PushFrameYuv(byte[] y, byte[] u, byte[] v, int width, int height);
+        /// <summary>
+        /// Push one planar I420 frame into the video track. Buffers are
+        /// <c>sbyte[]</c> because that is the true JNI type of a Kotlin
+        /// <c>ByteArray</c> — Unity's JNI helper reflects on the RUNTIME array
+        /// type to build the call signature, so a <c>byte[]</c> (even reinterpret
+        /// cast) takes the obsolete-signature path and logs a warning per call.
+        /// </summary>
+        void PushFrameYuv(sbyte[] y, sbyte[] u, sbyte[] v, int width, int height);
 
         /// <summary>Push one packed RGB24 frame (CPU fallback path; the plugin converts).</summary>
-        void PushFrameRgb(byte[] rgb, int width, int height);
+        void PushFrameRgb(sbyte[] rgb, int width, int height);
 
         /// <summary>Send a text message to the server over the detections channel.</summary>
         void SendDataChannelMessage(string message);
