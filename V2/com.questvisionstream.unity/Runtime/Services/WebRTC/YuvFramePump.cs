@@ -20,7 +20,13 @@ namespace QuestVisionStream.Services
     {
         private const string ShaderResourcePath = "QuestVisionStream/RGBToYUV420";
 
+        // Blit UVs for the vertical flip: scale (1,-1), offset (0,1) samples the
+        // source bottom-up — free, no extra pass.
+        private static readonly Vector2 FlipScale = new Vector2(1f, -1f);
+        private static readonly Vector2 FlipOffset = new Vector2(0f, 1f);
+
         private readonly bool useGpu;
+        private readonly bool flipVertically;
         private ComputeShader shader;
         private int kernel;
         private RenderTexture blitTexture;
@@ -31,8 +37,9 @@ namespace QuestVisionStream.Services
         private int height;
         private bool readbackInFlight;
 
-        public YuvFramePump(bool useGpuConversion)
+        public YuvFramePump(bool useGpuConversion, bool flipVertically = true)
         {
+            this.flipVertically = flipVertically;
             shader = Resources.Load<ComputeShader>(ShaderResourcePath);
             useGpu = useGpuConversion && shader != null && SystemInfo.supportsComputeShaders;
             if (useGpu)
@@ -89,7 +96,18 @@ namespace QuestVisionStream.Services
                 return;
             }
 
-            Graphics.Blit(source, blitTexture);
+            // Send the stream UPRIGHT: the GPU readback convention delivers frames
+            // vertically flipped on-device (this was why the V1 server defaulted
+            // QVS_FLIP_VERTICAL=true). Correcting at source is free here and keeps
+            // the wire truthful — run the server with QVS_FLIP_VERTICAL=false.
+            if (flipVertically)
+            {
+                Graphics.Blit(source, blitTexture, FlipScale, FlipOffset);
+            }
+            else
+            {
+                Graphics.Blit(source, blitTexture);
+            }
 
             if (useGpu)
             {
