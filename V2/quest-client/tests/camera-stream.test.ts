@@ -5,6 +5,7 @@
  * module seam; the system's logic runs unmodified.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppConfig } from '../src/config';
 
 vi.mock('@iwsdk/core', () => {
   class SystemBase {
@@ -124,19 +125,39 @@ describe('streaming baselines', () => {
     expect(qualifier.provider).toBeTypeOf('function');
   });
 
-  it('toggles the outbound track from the quality gate', async () => {
+  it('toggles the outbound track from the quality gate when gating is enabled', async () => {
+    AppConfig.camera.gateStreamOnQuality = true;
+    try {
+      const stream = fakeStream();
+      const track = stream.getVideoTracks()[0]!;
+      const { system, qualifier } = makeSystem({ state: CameraState.Active, stream });
+
+      system.update(); // begins streaming
+      await flushMicrotasks();
+
+      qualifier.shouldStream = false;
+      system.update();
+      expect(track.enabled).toBe(false);
+
+      qualifier.shouldStream = true;
+      system.update();
+      expect(track.enabled).toBe(true);
+    } finally {
+      AppConfig.camera.gateStreamOnQuality = false;
+    }
+  });
+
+  it('leaves the track enabled when the gate is off (default — ungated stream)', async () => {
+    // A disabled track sends black frames and blacks the qualifier's own sample,
+    // which deadlocks; the default keeps the stream flowing regardless of light.
     const stream = fakeStream();
     const track = stream.getVideoTracks()[0]!;
     const { system, qualifier } = makeSystem({ state: CameraState.Active, stream });
 
-    system.update(); // begins streaming
+    system.update();
     await flushMicrotasks();
 
     qualifier.shouldStream = false;
-    system.update();
-    expect(track.enabled).toBe(false);
-
-    qualifier.shouldStream = true;
     system.update();
     expect(track.enabled).toBe(true);
   });

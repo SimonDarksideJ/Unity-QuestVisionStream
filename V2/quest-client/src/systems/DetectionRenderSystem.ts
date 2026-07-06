@@ -47,6 +47,8 @@ export class DetectionRenderSystem
   private readonly poseHistory = new PoseHistory();
   private readonly latency = new LatencyEstimator(AppConfig.assumedLatencyMs);
   private unsub: (() => void) | undefined;
+  /** Detection payloads received since the last (1 s-throttled) log line. */
+  private payloadsSinceLog = 0;
 
   override init(): void {
     const detection = getServiceManager().resolve(IDetectionService);
@@ -160,13 +162,18 @@ export class DetectionRenderSystem
     frame: number;
     detections: readonly { label: string; conf: number; bbox: readonly number[] }[];
   }): void {
+    // Count every payload; report the per-second RATE (not the cumulative frame
+    // index) when the 1 s throttle opens, so the log reflects actual throughput.
+    this.payloadsSinceLog += 1;
     if (!uiLog.allow('detections', 1000)) return;
-    const { width, height, frame, detections } = payload;
+    const rate = this.payloadsSinceLog;
+    this.payloadsSinceLog = 0;
+    const { width, height, detections } = payload;
     if (detections.length === 0) {
-      uiLog.push(`↓ ${width}×${height} · frame ${frame} · nothing found`);
+      uiLog.push(`↓ ${width}×${height} · ${rate} frames/s · nothing found`);
       return;
     }
-    uiLog.push(`↓ ${width}×${height} · frame ${frame} · ${detections.length} found`);
+    uiLog.push(`↓ ${width}×${height} · ${rate} frames/s · ${detections.length} found`);
     for (const d of detections) {
       const bbox = d.bbox.map((n) => Math.round(n)).join(', ');
       uiLog.push(`   • ${d.label} ${Math.round(d.conf * 100)}% [${bbox}]`);

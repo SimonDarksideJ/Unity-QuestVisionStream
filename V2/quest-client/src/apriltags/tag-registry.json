@@ -1,0 +1,15 @@
+{
+  "dictionary": "APRILTAG_36h11",
+  "tags": [
+    { "id": 0, "name": "Alpha", "color": "#ff3b30" },
+    { "id": 1, "name": "Bravo", "color": "#ff9500" },
+    { "id": 2, "name": "Charlie", "color": "#ffcc00" },
+    { "id": 3, "name": "Delta", "color": "#34c759" },
+    { "id": 4, "name": "Echo", "color": "#00c7be" },
+    { "id": 5, "name": "Foxtrot", "color": "#30b0c7" },
+    { "id": 6, "name": "Golf", "color": "#007aff" },
+    { "id": 7, "name": "Hotel", "color": "#5856d6" },
+    { "id": 8, "name": "India", "color": "#af52de" },
+    { "id": 9, "name": "Juliet", "color": "#ff2d92" }
+  ]
+}

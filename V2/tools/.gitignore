@@ -1,2 +1,5 @@
 # Runtime logs + pid files written by setup-tailscale-mac.sh
 .run/
+
+# Generated AprilTag PNGs — reproducible via ./generate-apriltags.sh
+apriltags/

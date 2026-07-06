@@ -20,6 +20,7 @@ on the loop thread (GUI toolkits dislike worker threads).
 from __future__ import annotations
 
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Optional
 
@@ -62,7 +63,16 @@ class VideoProcessor:
         self._last_recv_log = 0.0
         self._recv_window_start = 0.0
         self._recv_window_count = 0
+        self._recv_window_dropped_start = 0
         self._last_sent_log = 0.0
+        self._sent_window_processed_start = 0
+        # Darkness/what-am-I-seeing diagnostic: set QVS_DUMP_DIR to a folder and
+        # the processor writes a JPEG of the actual received frame every ~2 s
+        # (filename carries the mean luma). Ground truth for "too dark" / "nothing
+        # found" — the raw getUserMedia passthrough frame is often much darker
+        # than the tone-mapped view you see through the headset.
+        self._dump_dir = os.getenv("QVS_DUMP_DIR", "").strip()
+        self._last_dump = 0.0
 
     def _preprocess(self, frame) -> np.ndarray | None:
         try:
@@ -90,6 +100,20 @@ class VideoProcessor:
         if img is None:
             return None
         return img, self.detect(img)
+
+    def _dump_frame(self, img: np.ndarray, luma: float) -> None:
+        """Write the received frame to QVS_DUMP_DIR for eyeball inspection."""
+        try:
+            import cv2
+
+            os.makedirs(self._dump_dir, exist_ok=True)
+            path = os.path.join(
+                self._dump_dir, f"frame_{self.frame_count:06d}_luma{luma:03.0f}.jpg"
+            )
+            cv2.imwrite(path, img)
+            print(f"[QVS ▣] wrote {path}")
+        except Exception as exc:  # pragma: no cover - diagnostic only
+            print(f"[VideoProcessor] Frame dump failed: {exc}")
 
     def _maybe_display(self, img: np.ndarray, detections: "list[Detection]") -> bool:
         if not self.config.enable_display or not self._display_ok:
@@ -129,6 +153,8 @@ class VideoProcessor:
         self._recv_window_start = loop.time()
         self._last_recv_log = loop.time()
         self._last_sent_log = loop.time()
+        self._recv_window_dropped_start = self.dropped_count
+        self._sent_window_processed_start = self.processed_count
 
         latest: Optional[Any] = None
         frame_ready = asyncio.Event()
@@ -152,13 +178,18 @@ class VideoProcessor:
                     if now - self._last_recv_log >= 5.0:
                         span = now - self._recv_window_start
                         fps = self._recv_window_count / span if span > 0 else 0.0
+                        window_dropped = self.dropped_count - self._recv_window_dropped_start
+                        # Per-window counts (not cumulative): how many frames actually
+                        # arrived in the last ~5 s, and how many were stale-dropped.
                         print(
-                            f"[QVS ↑] receiving frames — {frame.width}x{frame.height} "
-                            f"@ {fps:.1f} fps (received {self.frame_count}, dropped {self.dropped_count})"
+                            f"[QVS ↑] {frame.width}x{frame.height} — {self._recv_window_count} frames "
+                            f"in {span:.1f}s @ {fps:.1f} fps ({window_dropped} stale-dropped) "
+                            f"· {self.frame_count} total"
                         )
                         self._last_recv_log = now
                         self._recv_window_start = now
                         self._recv_window_count = 0
+                        self._recv_window_dropped_start = self.dropped_count
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -204,17 +235,31 @@ class VideoProcessor:
                     }
                 )
 
-                # Outbound reply summary every 1 s — resolution + what was found,
-                # so the console mirrors the client's receipt log.
+                # Outbound reply summary every 1 s — resolution + mean luma (0..255,
+                # a darkness signal) + what was found, so the console mirrors the
+                # client and tells us whether the frame itself is just too dark.
                 now = loop.time()
+                luma = float(img.mean())
                 if now - self._last_sent_log >= 1.0:
                     if detections:
                         labels = ", ".join(sorted({str(d["label"]) for d in detections}))
                         found = f"{len(detections)} found: {labels}"
                     else:
                         found = "nothing found"
-                    print(f"[QVS ↓] detections {width}x{height} frame {self.frame_count} — {found}")
+                    # Frames actually run through detection in the last ~1 s (rate),
+                    # not the cumulative frame index.
+                    span = now - self._last_sent_log
+                    window_processed = self.processed_count - self._sent_window_processed_start
+                    rate = window_processed / span if span > 0 else 0.0
+                    print(
+                        f"[QVS ↓] {width}x{height} — {window_processed} processed "
+                        f"({rate:.1f}/s) luma={luma:.0f}/255 — {found}"
+                    )
                     self._last_sent_log = now
+                    self._sent_window_processed_start = self.processed_count
+                if self._dump_dir and now - self._last_dump >= 2.0:
+                    self._dump_frame(img, luma)
+                    self._last_dump = now
 
                 if not self._maybe_display(img, detections):
                     break

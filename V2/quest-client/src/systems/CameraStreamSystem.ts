@@ -103,8 +103,11 @@ export class CameraStreamSystem extends createSystem({}) {
       return;
     }
 
-    // Edge gate: pause/resume the outbound track based on image quality.
-    if (this.videoTrack && this.qualifier) {
+    // Edge quality gate — OFF by default (see AppConfig.camera.gateStreamOnQuality).
+    // Disabling a track transmits black frames AND blacks the local <video> the
+    // qualifier samples, so a single "too dark" verdict deadlocks. The stream is
+    // ungated; the qualifier still reports brightness (status 'quality').
+    if (AppConfig.camera.gateStreamOnQuality && this.videoTrack && this.qualifier) {
       const desired = this.qualifier.shouldStream;
       if (this.videoTrack.enabled !== desired) this.videoTrack.enabled = desired;
     }

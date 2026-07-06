@@ -36,6 +36,56 @@ export function createDetectionBox(
 }
 
 /**
+ * A **filled, colour-tinted plane** covering an AprilTag, plus a solid outline
+ * and a name label — the visual anchor an interactive 3D model can later be
+ * parented to. `corners` are the tag's four corners already unprojected to WORLD
+ * space (the detector's corner order); the quad is two triangles over them.
+ *
+ * Rendered double-sided and depth-write-off (it's a translucent overlay), so it
+ * reads clearly against passthrough regardless of which way the tag faces.
+ */
+export function createTagPlane(
+  corners: readonly THREE.Vector3[],
+  label: string,
+  colorHex: string,
+): THREE.Object3D {
+  const group = new THREE.Group();
+  const color = new THREE.Color(colorHex);
+
+  // Filled quad: corners 0-1-2 and 0-2-3 (fan) over the four unprojected points.
+  const geometry = new THREE.BufferGeometry().setFromPoints(corners as THREE.Vector3[]);
+  geometry.setIndex([0, 1, 2, 0, 2, 3]);
+  geometry.computeVertexNormals();
+  const fill = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  group.add(fill);
+
+  // Solid outline for a crisp edge on top of the translucent fill.
+  const outline = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(corners as THREE.Vector3[]),
+    new THREE.LineBasicMaterial({ color }),
+  );
+  group.add(outline);
+
+  // Label at the visually-topmost corner, nudged clear of the edge.
+  const top = corners.reduce((a, b) => (b.y > a.y ? b : a), corners[0]!);
+  const sprite = createTextSprite(label, colorHex);
+  sprite.position.copy(top);
+  sprite.position.y += 0.04;
+  group.add(sprite);
+
+  return group;
+}
+
+/**
  * Builds the visual for a world-anchored detection tag: a small emissive marker
  * plus a billboarded text label rendered to a canvas texture. This is the WebXR
  * analogue of the Unity `DetectionTag` prefab (`DetectionTagController`), minus

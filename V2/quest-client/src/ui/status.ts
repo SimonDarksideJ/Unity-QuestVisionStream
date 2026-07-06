@@ -207,12 +207,18 @@ export function wireStatusServices(model: StatusModel, services: StatusServices)
   }
   if (services.qualifier) {
     unsubs.push(
-      services.qualifier.on('quality', (report) =>
-        model.set(
-          'quality',
-          report.ok ? 'ok' : `paused (${report.metrics.map((m) => m.detail ?? m.name).join(', ')})`,
-        ),
-      ),
+      services.qualifier.on('quality', (report) => {
+        // Always include each metric's NUMERIC value (e.g. brightness 0..255),
+        // not just the word "too dark" — this is what lets us compare the
+        // client's measured luma against the server's `luma=` and tell a real
+        // dark frame from a mis-sampled buffer. Forwarded to the server console
+        // too (status uplink), so both numbers land in one place.
+        const detail = report.metrics
+          .map((m) => `${m.name} ${Math.round(m.value)}${m.detail ? ` ${m.detail}` : ''}`)
+          .join(', ');
+        const suffix = detail ? ` — ${detail}` : '';
+        model.set('quality', `${report.ok ? 'ok' : 'paused'}${suffix}`);
+      }),
     );
   }
   if (services.detection) {

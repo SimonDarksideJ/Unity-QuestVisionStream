@@ -75,6 +75,14 @@ describe('wireStatusServices', () => {
     expect(model.get('quality')).toContain('paused');
     qualifier.emit('quality', { ok: true, score: 1, metrics: [], timestamp: 0 });
     expect(model.get('quality')).toBe('ok');
+    // The numeric metric value is surfaced (needed to diagnose the low-light gate).
+    qualifier.emit('quality', {
+      ok: false,
+      score: 0.5,
+      metrics: [{ name: 'brightness', value: 22.4, score: 0.5, ok: false, detail: 'too dark' }],
+      timestamp: 0,
+    });
+    expect(model.get('quality')).toBe('paused — brightness 22 too dark');
 
     detection.emit('detections', {
       type: 'detections',

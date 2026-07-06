@@ -19,7 +19,20 @@ export const AppConfig = {
    * enumerates as a single front-labelled device, so requesting `back` fails
    * ("No back-facing camera available"). Use the available one.
    */
-  camera: { facing: 'unknown' as const, width: 1280, height: 960, frameRate: 30 },
+  camera: {
+    facing: 'unknown' as const,
+    width: 1280,
+    height: 960,
+    frameRate: 30,
+    /**
+     * Let the edge quality gate pause the OUTBOUND track on low light. Default
+     * OFF: a disabled MediaStreamTrack transmits black frames AND blacks the
+     * local <video> the qualifier samples, so one "too dark" verdict deadlocks
+     * (black → too dark → stays paused). Keeping the stream ungated makes
+     * detections fluid; the qualifier still reports brightness for diagnostics.
+     */
+    gateStreamOnQuality: false,
+  },
   /** Flip Y when mapping stream boxes to the viewport (matches server v-flip). */
   invertY: true,
   /** Fixed placement distance (m) along the detection ray when no depth hit. */
@@ -27,12 +40,48 @@ export const AppConfig = {
   /** Deduplicate one tag per class (matches the Unity default). */
   dedupPolicy: 'per-class' as const,
   /**
+   * Edge quality gate thresholds (mean luma, 0..255). A frame darker than
+   * `minLuma` pauses the outbound stream ("too dark"). The Quest passthrough
+   * camera's RAW getUserMedia feed is much darker than the tone-mapped view you
+   * see, so `40` can trip in a room that looks bright — lower this once you've
+   * confirmed the real luma from the server log / client status.
+   */
+  qualifier: { minLuma: 40, maxLuma: 230 },
+  /**
    * Assumed capture→detection round-trip (ms). Detections are placed through
    * the camera pose from this long ago (see PoseHistory), not the pose at
    * arrival. Tune per deployment; the wire `pts` field enables estimating it
    * dynamically later.
    */
   assumedLatencyMs: 200,
+
+  /**
+   * Client-side AprilTag detection (runs locally on the passthrough frame — see
+   * AprilTagSystem). Independent of the server object-detection stream.
+   *   - `detectIntervalMs`: throttle detection to bound CPU (native ~30fps).
+   *   - `width`/`height`: resolution the frame is sampled to before decoding
+   *     (36h11 needs enough pixels on the tag; too large is just slower).
+   *   - `flipX`/`flipY`: correct a mirrored/rotated passthrough feed on-device —
+   *     if planes land mirrored or upside down, toggle these (no rebuild needed
+   *     to try: they're read here, but calibrate once and commit).
+   *   - `tagTtlMs`: keep a placed plane this long after a tag was last seen.
+   */
+  apriltag: {
+    enabled: true,
+    detectIntervalMs: 120,
+    width: 640,
+    height: 480,
+    flipX: false,
+    flipY: false,
+    tagTtlMs: 8000,
+    /**
+     * Only place tags present in the registry. AprilTag decoders occasionally
+     * misread clutter (even a tag's own printed caption) as a stray id; for a
+     * known test set, ignoring unregistered ids removes those ghost planes. Set
+     * false to surface every detected tag.
+     */
+    knownTagsOnly: true,
+  },
 };
 
 const DEFAULT_SIGNALING_URL = 'ws://localhost:3000';

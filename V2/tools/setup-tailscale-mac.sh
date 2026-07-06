@@ -211,8 +211,39 @@ cleanup() {
   step "Shutting down"
   [[ -n "$TAIL_PID" ]] && kill "$TAIL_PID" 2>/dev/null || true
   [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null || true
+  # Fallback: run-local.sh may spawn (not exec) Python, so $SERVER_PID can be the
+  # wrapper shell and leave the real server orphaned. Reap it by name too — this
+  # is exactly what left a process holding 8080/3000 across runs.
+  pkill -f 'questvisionstream' 2>/dev/null || true
   "$TS" serve --bg --https=443 off >/dev/null 2>&1 || true
   ok "Stopped the server and removed the Tailscale serve mount"
+}
+
+# Clear our own stale server from a port, or abort if something else owns it.
+# Prevents the "address already in use" crash when a prior (or --detach) run left
+# a `questvisionstream` process behind.
+free_stale_port() {  # free_stale_port <port> <label>
+  local port="$1" label="$2" pids
+  pids="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)"
+  [[ -z "$pids" ]] && return 0
+  local pid
+  for pid in $pids; do
+    if ps -o command= -p "$pid" 2>/dev/null | grep -q 'questvisionstream'; then
+      warn "$label port $port held by a stale server (pid $pid) — stopping it"
+      kill "$pid" 2>/dev/null || true
+    else
+      die "$label port $port is in use by another process (pid $pid: $(ps -o command= -p "$pid" 2>/dev/null | head -c 80)). Free it and retry."
+    fi
+  done
+  # Wait for the port to actually release before we launch on it.
+  local i=0
+  while lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1; do
+    i=$((i+1)); [[ $i -ge 5 ]] && { pkill -9 -f 'questvisionstream' 2>/dev/null || true; sleep 1; break; }
+    sleep 1
+  done
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1 \
+    && die "$label port $port is still in use after stopping the stale server."
+  ok "$label port $port is free"
 }
 wait_for() {  # wait_for <url> <label> <max_seconds>
   local url="$1" label="$2" max="${3:-40}" i=0
@@ -224,6 +255,10 @@ wait_for() {  # wait_for <url> <label> <max_seconds>
 }
 
 step "Starting the streaming server (detector=${QVS_DETECTOR:-yolo})"
+# Pre-flight: a prior/--detach run may still hold these ports. Clear our own
+# stale server (or abort if something else owns them) so the launch can bind.
+free_stale_port "$SIGNAL_PORT" "Signaling"
+free_stale_port "$HEALTH_PORT" "Health"
 cd "$SERVER_DIR"
 # run-local.sh creates the venv, installs deps, sets the MPS env, and execs the server.
 # PYTHONUNBUFFERED=1 forces line/stream flushing — otherwise Python block-buffers

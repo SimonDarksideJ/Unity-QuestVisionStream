@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
 /**
@@ -11,7 +12,19 @@ import { fileURLToPath, URL } from 'node:url';
  * library). Its `@realitycollective/service-framework` import resolves from
  * node_modules like any other npm dependency.
  */
+
+// Single source of truth for the reported build: package.json's version. Injected
+// as __CLIENT_VERSION__ so the client always tells the server its ACTUAL deployed
+// version (no hand-edited string to drift). Bumping the version — which already
+// triggers the deploy workflow — updates what's reported automatically.
+const { version } = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'),
+) as { version: string };
+
 export default defineConfig({
+  define: {
+    __CLIENT_VERSION__: JSON.stringify(version),
+  },
   resolve: {
     alias: {
       '@questvisionstream/client': fileURLToPath(

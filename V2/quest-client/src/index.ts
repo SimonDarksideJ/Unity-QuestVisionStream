@@ -5,26 +5,37 @@ import {
   type CreateSystemLike,
 } from '@realitycollective/service-framework-iwsdk';
 import {
-  createQuestVisionStreamProfile,
+  createQuestVisionStreamRegistrations,
   IDetectionService,
   IImageQualifierService,
   ISignalingService,
   IWebRTCService,
 } from '@questvisionstream/client';
-import { resolveSignalingUrl } from './config';
+import { createServiceProfile } from '@realitycollective/service-framework';
+import { AppConfig, resolveSignalingUrl } from './config';
 import { setServiceManager } from './runtime';
+import { createAprilTagRegistrations } from './services/apriltag/registrations';
+import { IAprilTagRoutingService } from './services/apriltag/IAprilTagRoutingService';
 import { CameraStreamSystem } from './systems/CameraStreamSystem';
 import { DetectionRenderSystem } from './systems/DetectionRenderSystem';
+import { AprilTagSystem } from './systems/AprilTagSystem';
 import { StatusSpriteSystem } from './systems/StatusSpriteSystem';
 import { bindStatusDom, status, wireStatusServices } from './ui/status';
 import { uiLog } from './ui/uiLog';
 
 /**
- * Client build stamp, reported to the server on connect (`client = …`). Bump the
- * suffix whenever behaviour changes so a stale Cloudflare deploy is obvious in
- * the server log instead of being mistaken for a live bug.
+ * Injected from package.json at build time by Vite (see vite.config.ts) — the
+ * real deployed version, so it can never drift from a hand-edited constant.
  */
-const CLIENT_BUILD = '0.1.9 cid+keepalive+hardening';
+declare const __CLIENT_VERSION__: string;
+
+/**
+ * Client build stamp, reported to the server on connect (`client = …`) so a
+ * stale Cloudflare deploy is obvious in the server log instead of being mistaken
+ * for a live bug. Bump package.json's version (which also triggers the deploy)
+ * and this updates automatically.
+ */
+const CLIENT_BUILD = `v${__CLIENT_VERSION__}`;
 
 /** Host portion of a ws(s):// URL for compact display, or the raw value. */
 function hostOf(url: string): string {
@@ -193,12 +204,23 @@ async function bootstrap(): Promise<void> {
     },
   });
 
+  // Compose the streaming library's services with the client-side AprilTag
+  // services (config → detection → routing → placement) into one DI manager.
   const { manager, adapter } = startServiceRuntime(world, (frameSource) =>
-    createQuestVisionStreamProfile(
-      'quest-vision-stream',
-      { signalingUrl: signalingUrlForProfile, qualifier: { enabled: true }, logLevel: 'info' },
-      frameSource,
-    ),
+    createServiceProfile('quest-vision-stream', [
+      ...createQuestVisionStreamRegistrations(
+        {
+          signalingUrl: signalingUrlForProfile,
+          qualifier: {
+            enabled: true,
+            brightness: { minLuma: AppConfig.qualifier.minLuma, maxLuma: AppConfig.qualifier.maxLuma },
+          },
+          logLevel: 'info',
+        },
+        frameSource,
+      ),
+      ...createAprilTagRegistrations(),
+    ]),
   );
   setServiceManager(manager);
 
@@ -284,7 +306,19 @@ async function bootstrap(): Promise<void> {
     .registerSystem(bridgeSystem as never)
     .registerSystem(CameraStreamSystem)
     .registerSystem(DetectionRenderSystem)
+    .registerSystem(AprilTagSystem) // client-side AprilTag → coloured planes
     .registerSystem(StatusSpriteSystem); // in-AR headline HUD (head-locked)
+
+  // Rules engine seam (see AprilTagRoutingService). Behaviour is expressed as
+  // "See X → do Y" rules over tag lifecycle events, decoupled from detection and
+  // placement. Example: log the first sighting of each tag. Real rules (spawn a
+  // model, start a sequence, "wait for Z → look for J") register here later.
+  const routing = manager.resolve(IAprilTagRoutingService);
+  routing.addRule({
+    id: 'log-first-sighting',
+    on: 'tagEnter',
+    run: (event) => uiLog.push(`◆ rule: saw ${event.name}`),
+  });
 
   // Flat-page welcome screen + our own "Enter XR" button (no auto-offer).
   // Enabled only once the signaling socket connects (camera still waits for XR).
