@@ -88,14 +88,28 @@ arrives upright and the wire stays truthful for dumps/recordings/other
 consumers. **Run the server with `QVS_FLIP_VERTICAL=false`.** The detection
 `invertY` stays true either way — that converts image y-down to viewport y-up,
 independent of stream orientation.
-## Startup flow (warm-up screen)
+## Startup flow (warm-up screen — 1:1 with the IWSDK intro)
 
-Streaming does not start on launch. A head-locked warm-up panel shows live
-readiness — discovered server, signaling state, camera state — so the
-connection can be confirmed before a single frame leaves the headset:
+Streaming does not start on launch. The warm-up screen is the web client's
+intro card (`quest-client/index.html` + `wireIntro`) re-engineered in Unity UI
+— same card, same single button, same gating and hint texts:
 
-- **(A)** right controller — start streaming (enabled once signaling +
-  camera are ready; the session also renegotiates automatically from then on).
+| State | Button | Note |
+|---|---|---|
+| Camera initialising | `Checking camera…` (disabled) | "Waiting for the passthrough camera…" |
+| Camera error | `Camera unavailable` (disabled) | red, with the error detail |
+| Signaling connecting | `Connecting…` (disabled) | "Connecting to server…" |
+| Signaling **connected** | **`Enter ( A )` — enabled** | — |
+| Dropped, close 4000 | `Enter` (disabled) | red: "Another device is already connected — close it, then restart to take over." |
+| Dropped, other | `Enter` (disabled) | red: "Unable to connect to server, have you connected the VPN and started the server?" |
+| After Enter | `Starting…` → card hides once streaming is live | red "Could not start streaming: …" on failure |
+
+(The web's "Checking XR…"/"XR unavailable" tier maps to the passthrough camera
+check — the equivalent platform gate on Quest.) Signaling connects on launch;
+**no camera frame leaves the headset until Enter**.
+
+- **(A)** right controller — presses the Enter button (acts only while enabled,
+  exactly like a disabled DOM button).
 - **(B)** right controller — toggle the live debug panel: every status field
   plus the WebRTC state and its last connection diagnostic ("offer sent" →
   "answer received" → "ICE: CHECKING" → …), which pinpoints WHERE a failed

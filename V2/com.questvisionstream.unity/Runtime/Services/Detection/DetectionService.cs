@@ -22,8 +22,13 @@ namespace QuestVisionStream.Services
         [Tooltip("Flip X when normalizing bboxes — for mirrored streams.")]
         private bool invertX = false;
 
+        [SerializeField]
+        [Tooltip("Log every payload received from the server in full detail, prefixed [WSDetection] for logcat filtering.")]
+        private bool verboseDetectionLogging = true;
+
         public bool InvertY { get => invertY; set => invertY = value; }
         public bool InvertX { get => invertX; set => invertX = value; }
+        public bool VerboseDetectionLogging { get => verboseDetectionLogging; set => verboseDetectionLogging = value; }
     }
 
     /// <summary>
@@ -76,7 +81,7 @@ namespace QuestVisionStream.Services
             switch (DetectionChannelParser.Parse(json, out var payload))
             {
                 case DetectionChannelMessageKind.Ready:
-                    Debug.Log("[QVS:Detection] Server ready");
+                    Debug.Log("[WSDetection] server ready handshake received");
                     ServerReady?.Invoke();
                     break;
 
@@ -85,17 +90,49 @@ namespace QuestVisionStream.Services
                     var arrivalMs = poseTracking.NowMs;
                     poseTracking.ObserveArrival(arrivalMs, payload.Pts);
                     var batch = DetectionMath.ToRenderBatch(payload, profile.InvertY, profile.InvertX);
+
+                    if (profile.VerboseDetectionLogging)
+                    {
+                        Debug.Log(DescribePayload(payload, batch));
+                    }
+
                     DetectionsReceived?.Invoke(new DetectionArrival(payload, batch, arrivalMs));
                     break;
 
                 default:
                     InvalidCount++;
-                    if (InvalidCount == 1 || InvalidCount % 100 == 0)
-                    {
-                        Debug.LogWarning($"[QVS:Detection] Dropped {InvalidCount} unrecognised/invalid channel message(s)");
-                    }
+                    // Log the raw message so a schema drift is visible, not silent.
+                    var excerpt = json == null ? "<null>" : json.Length > 300 ? json.Substring(0, 300) + "…" : json;
+                    Debug.LogWarning($"[WSDetection] UNPARSED channel message #{InvalidCount}: {excerpt}");
                     break;
             }
+        }
+
+        /// <summary>Full-detail payload dump, [WSDetection]-prefixed for logcat filtering.</summary>
+        private static string DescribePayload(DetectionsPayload payload, RenderBatch batch)
+        {
+            var builder = new System.Text.StringBuilder(256);
+            builder.Append("[WSDetection] frame=").Append(payload.Frame)
+                .Append(" pts=").Append(payload.Pts.HasValue ? payload.Pts.Value.ToString() : "null")
+                .Append(" size=").Append(payload.Width).Append('x').Append(payload.Height)
+                .Append(" count=").Append(payload.Detections.Count);
+
+            for (var i = 0; i < payload.Detections.Count; i++)
+            {
+                var d = payload.Detections[i];
+                var n = batch.Detections[i];
+                builder.Append(i == 0 ? " :: " : " | ")
+                    .Append(d.Label)
+                    .Append(' ').Append(d.Conf.ToString("0.00"))
+                    .Append(" bbox=[").Append(d.X1.ToString("0")).Append(',').Append(d.Y1.ToString("0"))
+                    .Append(',').Append(d.X2.ToString("0")).Append(',').Append(d.Y2.ToString("0"))
+                    .Append("] center=(").Append(n.Center.x.ToString("0.000")).Append(',').Append(n.Center.y.ToString("0.000"))
+                    .Append(") rect=(").Append(n.Rect.X.ToString("0.000")).Append(',').Append(n.Rect.Y.ToString("0.000"))
+                    .Append(',').Append(n.Rect.Width.ToString("0.000")).Append(',').Append(n.Rect.Height.ToString("0.000"))
+                    .Append(')');
+            }
+
+            return builder.ToString();
         }
     }
 }

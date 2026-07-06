@@ -129,13 +129,13 @@ namespace QuestVisionStream.Services
             readbackInFlight = true;
             var frameWidth = width;
             var frameHeight = height;
-            byte[] yData = null;
-            byte[] uData = null;
-            byte[] vData = null;
+            sbyte[] yData = null;
+            sbyte[] uData = null;
+            sbyte[] vData = null;
             var pending = 3;
             var failed = false;
 
-            void OnPlaneDone(AsyncGPUReadbackRequest request, Action<byte[]> assign)
+            void OnPlaneDone(AsyncGPUReadbackRequest request, Action<sbyte[]> assign)
             {
                 if (request.hasError)
                 {
@@ -143,7 +143,9 @@ namespace QuestVisionStream.Services
                 }
                 else
                 {
-                    assign(request.GetData<byte>().ToArray());
+                    // sbyte[] straight out of the readback (same bytes) — the JNI
+                    // bridge needs the runtime array type to actually be sbyte[].
+                    assign(request.GetData<sbyte>().ToArray());
                 }
 
                 if (--pending > 0)
@@ -180,7 +182,7 @@ namespace QuestVisionStream.Services
                     return;
                 }
 
-                var data = request.GetData<byte>();
+                var data = request.GetData<sbyte>();
                 if (data.Length <= 0)
                 {
                     return;
