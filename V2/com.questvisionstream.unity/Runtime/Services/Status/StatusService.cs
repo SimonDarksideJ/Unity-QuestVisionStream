@@ -58,6 +58,7 @@ namespace QuestVisionStream.Services
             signaling.Disconnected += OnSignalingDisconnected;
             camera.StateChanged += OnCameraStateChanged;
             webrtc.StateChanged += OnWebRTCStateChanged;
+            webrtc.DiagnosticChanged += OnWebRTCDiagnostic;
             detections.ServerReady += OnServerReady;
             if (qualifier != null)
             {
@@ -101,6 +102,7 @@ namespace QuestVisionStream.Services
             signaling.Disconnected -= OnSignalingDisconnected;
             camera.StateChanged -= OnCameraStateChanged;
             webrtc.StateChanged -= OnWebRTCStateChanged;
+            webrtc.DiagnosticChanged -= OnWebRTCDiagnostic;
             detections.ServerReady -= OnServerReady;
             if (qualifier != null)
             {
@@ -121,7 +123,9 @@ namespace QuestVisionStream.Services
 
         private void OnSignalingConnected()
         {
-            Report(StatusModel.Fields.Signaling, "connected");
+            // Include WHERE we connected — the first question when anything fails.
+            var server = signaling.CurrentServerDisplay;
+            Report(StatusModel.Fields.Signaling, string.IsNullOrEmpty(server) ? "connected" : $"connected · {server}");
 
             // Full resend so a restarted server still has the complete device picture.
             foreach (var pair in new List<KeyValuePair<string, StatusEntry>>(Model.Entries))
@@ -168,7 +172,9 @@ namespace QuestVisionStream.Services
                     Report(StatusModel.Fields.Connection, "connected");
                     break;
                 case WebRTCConnectionState.Failed:
-                    Report(StatusModel.Fields.Connection, "failed — renegotiating", StatusSeverity.Error);
+                    // Say WHERE it died, not just that it failed — the last diagnostic
+                    // is the furthest point the connection reached.
+                    Report(StatusModel.Fields.Connection, $"failed after '{webrtc.LastDiagnostic}' — renegotiating", StatusSeverity.Error);
                     break;
                 case WebRTCConnectionState.Disconnected:
                     Report(StatusModel.Fields.Connection, "interrupted", StatusSeverity.Warning);
@@ -176,6 +182,16 @@ namespace QuestVisionStream.Services
                 default:
                     Report(StatusModel.Fields.Connection, state.ToString().ToLowerInvariant(), StatusSeverity.Progress);
                     break;
+            }
+        }
+
+        private void OnWebRTCDiagnostic(string diagnostic)
+        {
+            // Progress detail between hard states — never demote a Connected/Error entry.
+            if (webrtc.State != WebRTCConnectionState.Connected &&
+                webrtc.State != WebRTCConnectionState.Failed)
+            {
+                Report(StatusModel.Fields.Connection, diagnostic, StatusSeverity.Progress);
             }
         }
 

@@ -45,9 +45,14 @@ namespace QuestVisionStream.Services
         }
 
         public event Action<WebRTCConnectionState> StateChanged;
+        public event Action<string> DiagnosticChanged;
         public event Action<string> DetectionMessageReceived;
 
         public WebRTCConnectionState State => state;
+
+        public string LastDiagnostic { get; private set; } = "idle";
+
+        public bool StreamingRequested { get; private set; }
 
         private IWebRTCTransportModule Transport
         {
@@ -70,6 +75,8 @@ namespace QuestVisionStream.Services
         {
             base.Start();
 
+            StreamingRequested = profile.AutoStartSession;
+
             // The qualifier is an optional collaborator — resolve it lazily so a
             // profile without one still works.
             RealityCollective.ServiceFramework.Services.ServiceManager.Instance
@@ -91,8 +98,21 @@ namespace QuestVisionStream.Services
             transport.LocalOfferCreated += OnLocalOffer;
             transport.LocalCandidateGathered += OnLocalCandidate;
             transport.ConnectionStateChanged += OnTransportStateChanged;
+            transport.IceStateChanged += OnIceStateChanged;
             transport.DataChannelMessageReceived += OnDataChannelMessage;
             transport.ConfigureIce(BuildIceServers());
+        }
+
+        /// <inheritdoc />
+        public void BeginStreaming()
+        {
+            if (StreamingRequested)
+            {
+                return;
+            }
+
+            StreamingRequested = true;
+            ReportDiagnostic("streaming requested");
         }
 
         /// <inheritdoc />
@@ -114,8 +134,11 @@ namespace QuestVisionStream.Services
                 return;
             }
 
-            // Session start gate: camera delivering frames + signaling open.
+            // Session start gate: user/profile requested + camera delivering frames
+            // + signaling open. The warm-up screen holds StreamingRequested false
+            // until the user confirms.
             if (!sessionRequested &&
+                StreamingRequested &&
                 camera.State == CameraStreamState.Active &&
                 signaling.IsConnected)
             {
@@ -179,21 +202,34 @@ namespace QuestVisionStream.Services
             frameCounter = 0;
 
             var resolution = camera.StreamResolution;
-            Debug.Log($"[QVS:WebRTC] Starting session {resolution.x}x{resolution.y} @{profile.TargetFps}fps");
+            ReportDiagnostic($"starting session {resolution.x}x{resolution.y} @{profile.TargetFps}fps");
             pump.Configure(resolution.x, resolution.y);
             transport.StartSession(resolution.x, resolution.y, profile.TargetFps);
         }
 
         private void OnLocalOffer(string sdp)
         {
-            Debug.Log("[QVS:WebRTC] Offer created; sending");
+            ReportDiagnostic("offer sent");
             signaling.SendOffer(sdp);
         }
 
         private void OnLocalCandidate(IceCandidateMessage candidate)
             => signaling.SendCandidate(candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex);
 
-        private void OnAnswerReceived(string sdp) => Transport?.SetRemoteAnswer(sdp);
+        private void OnAnswerReceived(string sdp)
+        {
+            ReportDiagnostic("answer received — negotiating");
+            Transport?.SetRemoteAnswer(sdp);
+        }
+
+        private void OnIceStateChanged(string iceState) => ReportDiagnostic($"ICE: {iceState}");
+
+        private void ReportDiagnostic(string diagnostic)
+        {
+            LastDiagnostic = diagnostic;
+            Debug.Log($"[QVS:WebRTC] {diagnostic}");
+            DiagnosticChanged?.Invoke(diagnostic);
+        }
 
         private void OnCandidateReceived(IceCandidateMessage candidate) => Transport?.AddRemoteCandidate(candidate);
 

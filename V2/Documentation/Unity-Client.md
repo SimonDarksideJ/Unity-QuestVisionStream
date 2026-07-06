@@ -78,6 +78,22 @@ Frame path (proven V1 pipeline): passthrough texture → blit to ≤640x480 →
 GPU RGB→I420 (BT.601 compute shader) → async readback (latest-frame-wins) →
 JNI → `PixelDataVideoCapturer` → hardware encoder.
 
+## Startup flow (warm-up screen)
+
+Streaming does not start on launch. A head-locked warm-up panel shows live
+readiness — discovered server, signaling state, camera state — so the
+connection can be confirmed before a single frame leaves the headset:
+
+- **(A)** right controller — start streaming (enabled once signaling +
+  camera are ready; the session also renegotiates automatically from then on).
+- **(B)** right controller — toggle the live debug panel: every status field
+  plus the WebRTC state and its last connection diagnostic ("offer sent" →
+  "answer received" → "ICE: CHECKING" → …), which pinpoints WHERE a failed
+  connection died (Tailscale/wss = signaling row; media = ICE diagnostics).
+
+The gate is the `WebRTCServiceProfile.AutoStartSession` flag (the app sets it
+false); library consumers that want dive-straight-in behaviour leave it true.
+
 ## Server discovery (Cloudflare KV, same as the IWSDK client)
 
 The headset never needs a rebuild when the Mac's address changes. The flow is
