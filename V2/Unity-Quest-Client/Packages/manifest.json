@@ -63,8 +63,14 @@
         "com.realitycollective.utilities",
         "com.utilities.async",
         "com.utilities.extensions",
-        "com.utilities.websockets",
-        "jp.keijiro.apriltag"
+        "com.utilities.websockets"
+      ]
+    },
+    {
+      "name": "Keijiro",
+      "url": "https://registry.npmjs.com",
+      "scopes": [
+        "jp.keijiro"
       ]
     }
   ]
