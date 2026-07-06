@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quest Camera Probe</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0; padding: 20px; font: 18px/1.5 system-ui, sans-serif;
+        background: #0b0d12; color: #e8ecf4;
+      }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p.sub { opacity: 0.65; margin: 0 0 16px; }
+      button {
+        font: inherit; font-weight: 600; padding: 12px 18px; margin: 4px 6px 4px 0;
+        border: 0; border-radius: 10px; background: #23c3a8; color: #06222b; cursor: pointer;
+      }
+      button.secondary { background: #2a2e38; color: #cfe; }
+      .cams { margin: 14px 0; }
+      .cam {
+        border: 1px solid #222834; border-radius: 12px; padding: 12px 14px; margin: 10px 0;
+        background: #11151d;
+      }
+      .cam .label { font-weight: 700; }
+      .cam .meta { opacity: 0.7; font-size: 14px; word-break: break-all; }
+      .luma { font-weight: 800; font-size: 20px; }
+      .luma.ok { color: #39d353; } .luma.bad { color: #ff5b52; }
+      video { width: 220px; height: 165px; background: #000; border-radius: 8px; display: block; margin-top: 8px; }
+      #log { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 13px;
+             background: #06080c; border-radius: 10px; padding: 12px; margin-top: 16px; max-height: 40vh; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Quest Camera Probe</h1>
+    <p class="sub">
+      IWSDK-free test: does this device expose non-black world-facing cameras via
+      getUserMedia? Tap "Grant &amp; enumerate", then test each camera's brightness.
+    </p>
+
+    <button id="enumerate">1 · Grant &amp; enumerate cameras</button>
+    <button id="environment" class="secondary">2 · Try facingMode: environment</button>
+    <button id="testall" class="secondary">3 · Test every camera's brightness</button>
+
+    <div class="cams" id="cams"></div>
+    <div id="log"></div>
+
+    <script>
+      const logEl = document.getElementById('log');
+      const camsEl = document.getElementById('cams');
+      const log = (m) => {
+        logEl.textContent += m + '\n';
+        logEl.scrollTop = logEl.scrollHeight;
+        console.log('[probe]', m);
+      };
+
+      const canvas = document.createElement('canvas');
+
+      // Mean luma (0..255) of a video element's current frame, or -1 if not ready.
+      function sampleLuma(video) {
+        const w = video.videoWidth, h = video.videoHeight;
+        if (!w || !h) return -1;
+        canvas.width = 160; canvas.height = Math.round((160 * h) / w);
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        }
+        return sum / (data.length / 4);
+      }
+
+      // Open a stream, play it in a <video>, sample luma after it settles.
+      async function testStream(constraints, targetVideo) {
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (e) {
+          return { error: `${e.name}: ${e.message}` };
+        }
+        const track = stream.getVideoTracks()[0];
+        const settings = track.getSettings ? track.getSettings() : {};
+        const video = targetVideo || document.createElement('video');
+        video.setAttribute('playsinline', ''); video.muted = true;
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+        // Let auto-exposure warm up, then take the brightest of a few samples.
+        let best = -1;
+        for (let i = 0; i < 8; i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          best = Math.max(best, sampleLuma(video));
+        }
+        if (!targetVideo) stream.getTracks().forEach((t) => t.stop());
+        return { luma: best, settings, label: track.label };
+      }
+
+      let devices = [];
+
+      document.getElementById('enumerate').onclick = async () => {
+        camsEl.innerHTML = ''; logEl.textContent = '';
+        log('Requesting camera permission (getUserMedia video:true)…');
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({ video: true });
+          s.getTracks().forEach((t) => t.stop());
+          log('Permission granted.');
+        } catch (e) {
+          log('Permission FAILED: ' + e.name + ' — ' + e.message);
+          return;
+        }
+        const all = await navigator.mediaDevices.enumerateDevices();
+        devices = all.filter((d) => d.kind === 'videoinput');
+        log(`enumerateDevices → ${devices.length} video input(s):`);
+        camsEl.innerHTML = '';
+        devices.forEach((d, i) => {
+          const label = d.label || '(no label — permission not applied?)';
+          log(`  [${i}] ${label}  id=${d.deviceId.slice(0, 12)}…`);
+          const el = document.createElement('div');
+          el.className = 'cam';
+          el.innerHTML =
+            `<div class="label">Camera ${i}: ${label}</div>` +
+            `<div class="meta">deviceId ${d.deviceId.slice(0, 24)}…</div>` +
+            `<button data-i="${i}">Test this camera</button>` +
+            `<span class="luma" id="luma-${i}"></span>` +
+            `<video id="vid-${i}"></video>`;
+          camsEl.appendChild(el);
+          el.querySelector('button').onclick = () => testOne(i);
+        });
+        if (devices.length <= 1) {
+          log('⚠ Only ' + devices.length + ' camera exposed. On Quest 3 the world-facing');
+          log('  cameras should appear as extra devices (labelled back/left/right).');
+          log('  If only the selfie shows, the passthrough cameras are not being exposed.');
+        }
+      };
+
+      async function testOne(i) {
+        const d = devices[i];
+        const lumaEl = document.getElementById('luma-' + i);
+        const video = document.getElementById('vid-' + i);
+        lumaEl.textContent = ' …';
+        log(`Testing camera ${i} (${d.label || 'no label'})…`);
+        const r = await testStream({ video: { deviceId: { exact: d.deviceId } } }, video);
+        if (r.error) { lumaEl.textContent = ' ' + r.error; lumaEl.className = 'luma bad'; log('  ' + r.error); return; }
+        const dark = r.luma < 8;
+        lumaEl.textContent = `  luma ${r.luma.toFixed(0)}/255 ${dark ? '(BLACK)' : '(has image)'}`;
+        lumaEl.className = 'luma ' + (dark ? 'bad' : 'ok');
+        log(`  camera ${i}: luma=${r.luma.toFixed(0)} facing=${r.settings.facingMode ?? '?'} ${r.settings.width}x${r.settings.height}`);
+      }
+
+      document.getElementById('environment').onclick = async () => {
+        log('getUserMedia facingMode:{ideal:environment} …');
+        const r = await testStream({ video: { facingMode: { ideal: 'environment' } } });
+        if (r.error) { log('  ' + r.error); return; }
+        log(`  environment → luma=${r.luma.toFixed(0)} facing=${r.settings.facingMode ?? '?'} label="${r.label}"`);
+      };
+
+      document.getElementById('testall').onclick = async () => {
+        for (let i = 0; i < devices.length; i++) await testOne(i);
+      };
+    </script>
+  </body>
+</html>
