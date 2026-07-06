@@ -30,6 +30,8 @@ namespace QuestVisionStream.Services
 
         private WebSocket socket;
         private bool closedByUser;
+        private bool resolvingServerUrl;
+        private string resolvedServerUrl;
         private int reconnectAttempt;
         private float reconnectAtRealtime = -1f;
         private float nextKeepAliveRealtime = -1f;
@@ -97,10 +99,72 @@ namespace QuestVisionStream.Services
                 return;
             }
 
+            if (resolvingServerUrl)
+            {
+                return; // a resolve is in flight and will open the socket when done
+            }
+
+            // Server discovery: the host publishes its live Tailscale signaling URL
+            // to Cloudflare KV; we read it from the static /api/config endpoint so
+            // the headset never needs a rebuild when the address changes. Re-fetched
+            // on every (re)connect — KV reads are live and the address can move
+            // mid-session. Falls back to the profile URL when unreachable.
+            if (!string.IsNullOrEmpty(profile.RemoteConfigUrl))
+            {
+                ResolveServerUrlThenOpen();
+                return;
+            }
+
+            OpenSocket(profile.ServerUrl);
+        }
+
+        private void ResolveServerUrlThenOpen()
+        {
+            resolvingServerUrl = true;
+            var request = UnityEngine.Networking.UnityWebRequest.Get(profile.RemoteConfigUrl);
+            request.timeout = Mathf.Max(1, Mathf.RoundToInt(profile.RemoteConfigTimeoutSeconds));
+
+            var operation = request.SendWebRequest();
+            operation.completed += _ =>
+            {
+                resolvingServerUrl = false;
+
+                using (request)
+                {
+                    if (request.result == UnityEngine.Networking.UnityWebRequest.Result.Success &&
+                        RemoteConfig.TryParseServerUrl(request.downloadHandler.text, out var published))
+                    {
+                        if (published != resolvedServerUrl)
+                        {
+                            Debug.Log($"[QVS:Signaling] Remote config resolved signaling server: {Redact(published)}");
+                        }
+
+                        resolvedServerUrl = published;
+                    }
+                    else if (resolvedServerUrl == null)
+                    {
+                        Debug.LogWarning($"[QVS:Signaling] Remote config unavailable ({request.error ?? "no usable ws(s):// url"}) — using fallback {profile.ServerUrl}");
+                    }
+                    // else: keep the last successfully resolved URL.
+                }
+
+                // The world may have moved on while we were fetching.
+                if (closedByUser ||
+                    (socket != null && (socket.State == State.Open || socket.State == State.Connecting)))
+                {
+                    return;
+                }
+
+                OpenSocket(string.IsNullOrEmpty(resolvedServerUrl) ? profile.ServerUrl : resolvedServerUrl);
+            };
+        }
+
+        private void OpenSocket(string serverUrl)
+        {
             DisposeSocket();
 
-            var url = BuildUrl();
-            Debug.Log($"[QVS:Signaling] Connecting to {profile.ServerUrl}");
+            var url = BuildUrl(serverUrl);
+            Debug.Log($"[QVS:Signaling] Connecting to {Redact(serverUrl)}");
             var newSocket = new WebSocket(url);
             socket = newSocket;
 
@@ -237,17 +301,27 @@ namespace QuestVisionStream.Services
             reconnectAtRealtime = Time.realtimeSinceStartup + delay;
         }
 
-        private Uri BuildUrl()
+        private Uri BuildUrl(string serverUrl)
         {
-            var url = profile.ServerUrl.TrimEnd('/');
+            var url = serverUrl.TrimEnd('/');
             var separator = url.Contains("?") ? "&" : "?";
             url = $"{url}{separator}cid={connectionId}";
-            if (!string.IsNullOrEmpty(profile.AuthToken))
+
+            // The KV-published URL usually embeds its own ?token= — only add the
+            // profile token when the URL doesn't already carry one.
+            if (!string.IsNullOrEmpty(profile.AuthToken) && !url.Contains("token="))
             {
                 url += $"&token={Uri.EscapeDataString(profile.AuthToken)}";
             }
 
             return new Uri(url);
+        }
+
+        /// <summary>Log-safe form of a signaling URL (never leak an embedded token).</summary>
+        private static string Redact(string url)
+        {
+            var tokenIndex = url.IndexOf("token=", StringComparison.OrdinalIgnoreCase);
+            return tokenIndex < 0 ? url : url.Substring(0, tokenIndex) + "token=***";
         }
 
         private void DisposeSocket()

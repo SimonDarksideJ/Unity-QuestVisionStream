@@ -34,7 +34,11 @@ namespace QuestVisionStream.Client
 
         [Header("Server")]
         [SerializeField]
-        [Tooltip("Signaling WebSocket URL — e.g. ws://100.x.x.x:3000 (Tailscale IP of the Mac) or wss://machine.tailnet.ts.net")]
+        [Tooltip("Remote-config endpoint (Cloudflare Pages /api/config backed by KV). The server host publishes its live Tailscale signaling URL there — clients discover it at connect time, no rebuilds. Empty disables discovery.")]
+        private string remoteConfigUrl = "https://questvisionstream.pages.dev/api/config";
+
+        [SerializeField]
+        [Tooltip("Fallback signaling WebSocket URL when remote config is disabled or unreachable — e.g. ws://100.x.x.x:3000 (Tailscale IP of the Mac) or wss://machine.tailnet.ts.net")]
         private string serverUrl = "ws://localhost:3000";
 
         [SerializeField]
@@ -205,6 +209,7 @@ namespace QuestVisionStream.Client
         {
             // --- Signaling (priority 10) ---
             var signalingProfile = ScriptableObject.CreateInstance<SignalingServiceProfile>();
+            signalingProfile.RemoteConfigUrl = remoteConfigUrl;
             signalingProfile.ServerUrl = serverUrl;
             signalingProfile.AuthToken = authToken;
             serviceManager.TryCreateAndRegisterService<ISignalingService>(
