@@ -78,6 +78,24 @@ Frame path (proven V1 pipeline): passthrough texture → blit to ≤640x480 →
 GPU RGB→I420 (BT.601 compute shader) → async readback (latest-frame-wins) →
 JNI → `PixelDataVideoCapturer` → hardware encoder.
 
+## Server discovery (Cloudflare KV, same as the IWSDK client)
+
+The headset never needs a rebuild when the Mac's address changes. The flow is
+identical to the web client's:
+
+1. `tools/setup-tailscale-mac.sh` (run on the server host) publishes the live
+   signaling URL — `wss://<machine>.<tailnet>.ts.net/?token=…` — into the
+   Cloudflare KV namespace bound as `QVS_CONFIG` (key `signaling_url`).
+2. The static Pages Function `GET https://questvisionstream.pages.dev/api/config`
+   serves that value live (KV is read per request — changes apply in seconds).
+3. `SignalingService` fetches that endpoint on **every (re)connect** (4 s
+   timeout), adopts the published URL (embedded `?token=` included, `cid`
+   appended), and falls back to the profile's static `ServerUrl` when the
+   endpoint is unreachable or empty. Tokens are redacted from logs.
+
+The remote-config endpoint is a `SignalingServiceProfile` /
+bootstrap-inspector field; clear it to pin a static URL instead.
+
 ## Protocol (unchanged; V2 hardening honoured)
 
 Same wire protocol as V1/the server — one server serves every client. The Unity
