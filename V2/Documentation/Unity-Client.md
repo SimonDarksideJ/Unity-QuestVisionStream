@@ -33,10 +33,23 @@ ITagPlacementService (42)     coloured tag markers
 IStatusService (50)           status model → in-headset HUD + server uplink
 ```
 
-The scene contains a single `QuestVisionStream` GameObject with the
-`QuestVisionStreamBootstrap` component: it builds the XR rig in code, stands up
-the `GlobalServiceManager` and registers the graph code-first. Server URL, auth
-token, render mode, tag size etc. are all inspector fields on the bootstrap.
+`Assets/Scenes/QuestVisionStream.unity` contains the full working hierarchy:
+
+- **XR Origin › Camera Offset › Main Camera** — Camera (solid-colour clear,
+  alpha 0 for passthrough), `TrackedPoseDriver` (centre-eye bindings),
+  **`ARCameraManager`** (this is what enables passthrough *and* sources camera
+  frames under the OpenXR plugin — there are no OVR building blocks on this
+  path), URP camera data, AudioListener.
+- **AR Session** — `ARSession` (pairs with the enabled "Meta Quest: Session"
+  OpenXR feature).
+- **QuestVisionStream** — the **`GlobalServiceManager`** plus the
+  `QuestVisionStreamBootstrap` component, which registers the service graph
+  code-first (server URL, auth token, render mode, tag size etc. are its
+  inspector fields). To go fully asset-driven instead, assign a
+  `ServiceProvidersProfile` to the GlobalServiceManager and disable the
+  bootstrap's registration — every service/module already takes a
+  `(name, priority, profile, …)` constructor, so they configure from profile
+  assets unchanged.
 
 ## Camera access (important)
 
