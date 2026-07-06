@@ -50,6 +50,8 @@ namespace QuestVisionStream.Services
 
         public bool IsConnected => socket != null && socket.State == State.Open;
 
+        public string CurrentServerDisplay { get; private set; }
+
         public SignalingCloseInfo? LastCloseInfo => lastCloseInfo;
 
         /// <inheritdoc />
@@ -164,7 +166,8 @@ namespace QuestVisionStream.Services
             DisposeSocket();
 
             var url = BuildUrl(serverUrl);
-            Debug.Log($"[QVS:Signaling] Connecting to {Redact(serverUrl)}");
+            CurrentServerDisplay = Redact(serverUrl);
+            Debug.Log($"[QVS:Signaling] Connecting to {CurrentServerDisplay}");
             var newSocket = new WebSocket(url);
             socket = newSocket;
 

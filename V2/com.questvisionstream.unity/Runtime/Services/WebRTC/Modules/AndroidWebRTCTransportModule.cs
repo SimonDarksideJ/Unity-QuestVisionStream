@@ -43,6 +43,7 @@ namespace QuestVisionStream.Services
         public event Action<string> LocalOfferCreated;
         public event Action<IceCandidateMessage> LocalCandidateGathered;
         public event Action<WebRTCConnectionState> ConnectionStateChanged;
+        public event Action<string> IceStateChanged;
         public event Action<string> DataChannelMessageReceived;
 
         public bool IsAvailable
@@ -152,7 +153,11 @@ namespace QuestVisionStream.Services
         public void PushFrameYuv(byte[] y, byte[] u, byte[] v, int width, int height)
         {
 #if UNITY_ANDROID
-            plugin?.Call("updateFrameDataYUV", y, u, v, width, height);
+            // Kotlin ByteArray marshals as sbyte[]; passing byte[] would hit Unity's
+            // obsolete-signature reflection path and log a warning EVERY frame.
+            // The cast reinterprets the same array — no copy.
+            plugin?.Call("updateFrameDataYUV",
+                (sbyte[])(Array)y, (sbyte[])(Array)u, (sbyte[])(Array)v, width, height);
 #endif
         }
 
@@ -160,7 +165,7 @@ namespace QuestVisionStream.Services
         public void PushFrameRgb(byte[] rgb, int width, int height)
         {
 #if UNITY_ANDROID
-            plugin?.Call("updateFrameData", rgb, width, height);
+            plugin?.Call("updateFrameData", (sbyte[])(Array)rgb, width, height);
 #endif
         }
 
@@ -228,6 +233,10 @@ namespace QuestVisionStream.Services
 
                 case "pcState":
                     ConnectionStateChanged?.Invoke(MapState(root.Value<string>("state")));
+                    break;
+
+                case "iceState":
+                    IceStateChanged?.Invoke(root.Value<string>("state"));
                     break;
 
                 case "dcMessage":

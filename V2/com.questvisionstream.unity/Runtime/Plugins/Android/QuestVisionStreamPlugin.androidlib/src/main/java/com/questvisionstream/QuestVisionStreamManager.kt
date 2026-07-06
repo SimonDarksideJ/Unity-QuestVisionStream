@@ -139,6 +139,10 @@ class QuestVisionStreamManager(
 
             override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState) {
                 Log.i(TAG, "ICE connection: $newState")
+                emit(JSONObject().apply {
+                    put("event", "iceState")
+                    put("state", newState.name)
+                })
             }
 
             override fun onSignalingChange(newState: PeerConnection.SignalingState) {}

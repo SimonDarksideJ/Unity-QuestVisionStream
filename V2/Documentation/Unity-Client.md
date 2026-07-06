@@ -88,6 +88,21 @@ arrives upright and the wire stays truthful for dumps/recordings/other
 consumers. **Run the server with `QVS_FLIP_VERTICAL=false`.** The detection
 `invertY` stays true either way — that converts image y-down to viewport y-up,
 independent of stream orientation.
+## Startup flow (warm-up screen)
+
+Streaming does not start on launch. A head-locked warm-up panel shows live
+readiness — discovered server, signaling state, camera state — so the
+connection can be confirmed before a single frame leaves the headset:
+
+- **(A)** right controller — start streaming (enabled once signaling +
+  camera are ready; the session also renegotiates automatically from then on).
+- **(B)** right controller — toggle the live debug panel: every status field
+  plus the WebRTC state and its last connection diagnostic ("offer sent" →
+  "answer received" → "ICE: CHECKING" → …), which pinpoints WHERE a failed
+  connection died (Tailscale/wss = signaling row; media = ICE diagnostics).
+
+The gate is the `WebRTCServiceProfile.AutoStartSession` flag (the app sets it
+false); library consumers that want dive-straight-in behaviour leave it true.
 
 ## Server discovery (Cloudflare KV, same as the IWSDK client)
 

@@ -114,8 +114,8 @@ namespace QuestVisionStream.Client
 
         private void Start()
         {
-            // HUD after services are up (Start order: manager starts services first
-            // by component order; the HUD only polls, so exact order is not critical).
+            // HUD + warm-up screen after services are up (Start order: manager starts
+            // services first by component order; these only poll, so order is not critical).
             var camera = Camera.main;
             if (camera != null &&
                 serviceManager.TryGetService<IStatusService>(out var status))
@@ -123,6 +123,18 @@ namespace QuestVisionStream.Client
                 var hud = new GameObject("QVS_StatusHud");
                 hud.transform.SetParent(camera.transform, false);
                 hud.AddComponent<StatusHudController>().Initialize(status);
+
+                // Warm-up flow: confirm the connection, then (A) starts streaming,
+                // (B) toggles the live debug panel.
+                if (serviceManager.TryGetService<IWebRTCService>(out var webrtcService) &&
+                    serviceManager.TryGetService<ISignalingService>(out var signalingService) &&
+                    serviceManager.TryGetService<ICameraStreamService>(out var cameraService))
+                {
+                    var warmup = new GameObject("QVS_StartupFlow");
+                    warmup.transform.SetParent(camera.transform, false);
+                    warmup.AddComponent<StartupFlowController>()
+                        .Initialize(status, webrtcService, signalingService, cameraService);
+                }
             }
 
             // The demo rule from the WebXR client: prove the "see X → do Y" seam.
@@ -240,6 +252,8 @@ namespace QuestVisionStream.Client
             webrtcProfile.TargetFps = targetFps;
             webrtcProfile.SendEveryNthFrame = sendEveryNthFrame;
             webrtcProfile.GateStreamingOnQuality = gateStreamingOnQuality;
+            // Warm-up screen: nothing streams until the user confirms with (A).
+            webrtcProfile.AutoStartSession = false;
             serviceManager.TryCreateAndRegisterService<IWebRTCService>(
                 typeof(WebRTCService), out var webrtcService, "WebRTC", 20u, webrtcProfile);
             serviceManager.TryCreateAndRegisterService<IAndroidWebRTCTransportModule>(

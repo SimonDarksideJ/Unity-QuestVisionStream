@@ -51,6 +51,11 @@ namespace QuestVisionStream.Services
         [Tooltip("Stop pushing frames while the image qualifier reports ShouldStream=false. OFF by default: the raw passthrough feed reads darker than the tone-mapped view, and gating on it deadlocked the WebXR client.")]
         private bool gateStreamingOnQuality = false;
 
+        [Header("Session")]
+        [SerializeField]
+        [Tooltip("Start streaming as soon as camera + signaling are ready. Disable for a warm-up screen: the session then waits for IWebRTCService.BeginStreaming().")]
+        private bool autoStartSession = true;
+
         [Header("Recovery")]
         [SerializeField]
         [Tooltip("Renegotiate automatically when the peer connection fails or signaling is restored.")]
@@ -70,6 +75,7 @@ namespace QuestVisionStream.Services
         public bool UseGpuYuvConversion { get => useGpuYuvConversion; set => useGpuYuvConversion = value; }
         public bool FlipStreamVertically { get => flipStreamVertically; set => flipStreamVertically = value; }
         public bool GateStreamingOnQuality { get => gateStreamingOnQuality; set => gateStreamingOnQuality = value; }
+        public bool AutoStartSession { get => autoStartSession; set => autoStartSession = value; }
         public bool AutoReconnect { get => autoReconnect; set => autoReconnect = value; }
         public float ReconnectDelaySeconds { get => reconnectDelaySeconds; set => reconnectDelaySeconds = value; }
     }
