@@ -45,7 +45,7 @@ namespace QuestVisionStream.Services
     /// allocation) and fully destroyed on deactivation.
     /// </summary>
     [System.Runtime.InteropServices.Guid("bdaa4894-87fb-4343-9416-56e6e452ac42")]
-    public class EphemeralBoxRenderModule : BaseServiceModule, IDetectionRenderModule
+    public class EphemeralBoxRenderModule : BaseServiceModule, IEphemeralBoxRenderModule
     {
         private sealed class BoxVisual
         {

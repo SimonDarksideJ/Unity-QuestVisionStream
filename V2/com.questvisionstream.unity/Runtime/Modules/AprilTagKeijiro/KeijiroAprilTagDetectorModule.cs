@@ -27,6 +27,11 @@ namespace QuestVisionStream.Services
         public float TagSizeMeters { get => tagSizeMeters; set => tagSizeMeters = value; }
     }
 
+    /// <summary>Registration interface for <see cref="KeijiroAprilTagDetectorModule"/> — every module registers under its own interface (the SF registry forbids duplicate interface registrations).</summary>
+    public interface IKeijiroAprilTagDetectorModule : ITagDetectorModule
+    {
+    }
+
     /// <summary>
     /// <see cref="ITagDetectorModule"/> over <c>jp.keijiro.apriltag</c> (the
     /// official AprilTag C library with Unity job-system pose estimation).
@@ -37,7 +42,7 @@ namespace QuestVisionStream.Services
     /// <c>jp.keijiro.apriltag</c> is installed (see the asmdef versionDefines).
     /// </summary>
     [System.Runtime.InteropServices.Guid("45be85cb-7b19-45fc-bb8d-a74da03f0b9e")]
-    public class KeijiroAprilTagDetectorModule : BaseServiceModule, ITagDetectorModule
+    public class KeijiroAprilTagDetectorModule : BaseServiceModule, IKeijiroAprilTagDetectorModule
     {
         private readonly KeijiroAprilTagDetectorModuleProfile profile;
         private readonly List<(int id, Pose cameraSpacePose)> resultBuffer = new List<(int, Pose)>();

@@ -1,0 +1,29 @@
+{
+    "name": "QuestVisionStream.Client",
+    "rootNamespace": "QuestVisionStream.Client",
+    "references": [
+        "QuestVisionStream.Unity",
+        "QuestVisionStream.Unity.Tags.Keijiro",
+        "RealityCollective.ServiceFramework",
+        "RealityCollective.Utilities",
+        "Unity.XR.ARFoundation",
+        "Unity.XR.ARSubsystems",
+        "Unity.XR.CoreUtils",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "jp.keijiro.apriltag",
+            "expression": "1.0.0",
+            "define": "QVS_APRILTAG_KEIJIRO"
+        }
+    ],
+    "noEngineReferences": false
+}

@@ -1240,17 +1240,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e567abbf4d944210acb6315178bb015, type: 3}
   m_Name: ARCameraFeature Android
   m_EditorClassIdentifier: Unity.XR.MetaOpenXR::UnityEngine.XR.OpenXR.Features.Meta.ARCameraFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Camera (Passthrough)'
   version: 0.1.0
   featureIdInternal: com.unity.openxr.feature.arfoundation-meta-camera
   openxrExtensionStrings: XR_FB_passthrough
   company: Unity Technologies
   priority: 0
-  targetOpenXRApiVersion: 
+  targetOpenXRApiVersion:
   required: 0
-  customRuntimeLoaderName: 
-  m_CameraImageSupport: 0
+  customRuntimeLoaderName:
+  m_CameraImageSupport: 1
   m_PassthroughPreSplashScreen: 0
 --- !u!114 &11400000
 MonoBehaviour:

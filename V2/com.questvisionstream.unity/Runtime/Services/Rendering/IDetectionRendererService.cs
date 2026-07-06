@@ -36,6 +36,16 @@ namespace QuestVisionStream.Services
     }
 
     /// <summary>
+    /// Marker interface for <see cref="EphemeralBoxRenderModule"/>. Each concrete
+    /// module needs its own registration interface because the Service Framework
+    /// registry keys services by their most specific service interface — two
+    /// modules registered as plain <see cref="IDetectionRenderModule"/> would collide.
+    /// </summary>
+    public interface IEphemeralBoxRenderModule : IDetectionRenderModule
+    {
+    }
+
+    /// <summary>
     /// Routes detection batches to the single active render module, applying
     /// pose-freeze, and clears everything on tracking-space recenter (old-space
     /// placements are garbage after a recenter).

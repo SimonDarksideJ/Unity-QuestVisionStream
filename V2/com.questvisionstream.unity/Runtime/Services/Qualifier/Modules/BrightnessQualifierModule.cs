@@ -31,13 +31,18 @@ namespace QuestVisionStream.Services
         public int SmoothingSamples { get => smoothingSamples; set => smoothingSamples = value; }
     }
 
+    /// <summary>Registration interface for <see cref="BrightnessQualifierModule"/> — every module registers under its own interface (the SF registry forbids duplicate interface registrations).</summary>
+    public interface IBrightnessQualifierModule : IImageQualifierModule
+    {
+    }
+
     /// <summary>
     /// Rec.709 luminance qualifier, ported from Meta's
     /// <c>BrightnessEstimationManager</c> via the V2 TypeScript module: mean
     /// <c>0.2126R + 0.7152G + 0.0722B</c> over the sample, smoothed with a ring buffer.
     /// </summary>
     [System.Runtime.InteropServices.Guid("980ba51a-0a86-4c2e-bb9a-b291ffb6446a")]
-    public class BrightnessQualifierModule : BaseServiceModule, IImageQualifierModule
+    public class BrightnessQualifierModule : BaseServiceModule, IBrightnessQualifierModule
     {
         private readonly BrightnessQualifierModuleProfile profile;
         private readonly float[] window;

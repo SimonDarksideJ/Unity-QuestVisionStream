@@ -6,12 +6,16 @@ using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using QuestVisionStream.Protocol;
 using RealityCollective.ServiceFramework.Definitions;
-using RealityCollective.ServiceFramework.Interfaces;
 using RealityCollective.ServiceFramework.Modules;
 using UnityEngine;
 
 namespace QuestVisionStream.Services
 {
+    /// <summary>Registration interface for <see cref="AndroidWebRTCTransportModule"/> — every module registers under its own interface (the SF registry forbids duplicate interface registrations).</summary>
+    public interface IAndroidWebRTCTransportModule : IWebRTCTransportModule
+    {
+    }
+
     /// <summary>
     /// <see cref="IWebRTCTransportModule"/> over the minimal
     /// <c>QuestVisionStreamPlugin.androidlib</c> (native google-webrtc
@@ -20,12 +24,14 @@ namespace QuestVisionStream.Services
     /// Unavailable off-device (Editor/desktop) — the service logs and stays idle.
     /// </summary>
     [System.Runtime.InteropServices.Guid("213947d4-85e2-4406-b55d-4b07a79a042c")]
-    public class AndroidWebRTCTransportModule : BaseServiceModule, IWebRTCTransportModule
+    public class AndroidWebRTCTransportModule : BaseServiceModule, IAndroidWebRTCTransportModule
     {
         private const string PluginClass = "com.questvisionstream.QuestVisionStreamManager";
         private const string ReceiverName = "QVSPluginEventReceiver";
 
+#if UNITY_ANDROID
         private AndroidJavaObject plugin;
+#endif
         private QvsPluginEventReceiver receiver;
         private bool sessionActive;
 
@@ -80,6 +86,7 @@ namespace QuestVisionStream.Services
         /// <inheritdoc />
         public void ConfigureIce(IReadOnlyList<IceServerConfig> iceServers)
         {
+#if UNITY_ANDROID
             if (plugin == null)
             {
                 return;
@@ -105,11 +112,13 @@ namespace QuestVisionStream.Services
                     plugin.Call("addTurnServer", server.Url, server.Username, server.Credential ?? string.Empty);
                 }
             }
+#endif
         }
 
         /// <inheritdoc />
         public void StartSession(int width, int height, int targetFps)
         {
+#if UNITY_ANDROID
             if (plugin == null)
             {
                 Debug.LogWarning("[QVS:AndroidWebRTC] StartSession ignored — plugin unavailable on this platform.");
@@ -118,39 +127,68 @@ namespace QuestVisionStream.Services
 
             sessionActive = true;
             plugin.Call("startSession", width, height, targetFps);
+#else
+            Debug.LogWarning("[QVS:AndroidWebRTC] StartSession ignored — Android-only transport.");
+#endif
         }
 
         /// <inheritdoc />
-        public void SetRemoteAnswer(string sdp) => plugin?.Call("setRemoteAnswer", sdp);
+        public void SetRemoteAnswer(string sdp)
+        {
+#if UNITY_ANDROID
+            plugin?.Call("setRemoteAnswer", sdp);
+#endif
+        }
 
         /// <inheritdoc />
         public void AddRemoteCandidate(IceCandidateMessage candidate)
-            => plugin?.Call("addRemoteCandidate", candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex);
+        {
+#if UNITY_ANDROID
+            plugin?.Call("addRemoteCandidate", candidate.Candidate, candidate.SdpMid, candidate.SdpMLineIndex);
+#endif
+        }
 
         /// <inheritdoc />
         public void PushFrameYuv(byte[] y, byte[] u, byte[] v, int width, int height)
-            => plugin?.Call("updateFrameDataYUV", y, u, v, width, height);
+        {
+#if UNITY_ANDROID
+            plugin?.Call("updateFrameDataYUV", y, u, v, width, height);
+#endif
+        }
 
         /// <inheritdoc />
         public void PushFrameRgb(byte[] rgb, int width, int height)
-            => plugin?.Call("updateFrameData", rgb, width, height);
+        {
+#if UNITY_ANDROID
+            plugin?.Call("updateFrameData", rgb, width, height);
+#endif
+        }
 
         /// <inheritdoc />
-        public void SendDataChannelMessage(string message) => plugin?.Call("sendDataChannelMessage", message);
+        public void SendDataChannelMessage(string message)
+        {
+#if UNITY_ANDROID
+            plugin?.Call("sendDataChannelMessage", message);
+#endif
+        }
 
         /// <inheritdoc />
         public void CloseSession()
         {
             sessionActive = false;
+#if UNITY_ANDROID
             plugin?.Call("closeSession");
+#endif
         }
 
         /// <inheritdoc />
         public override void Destroy()
         {
             CloseSession();
+#if UNITY_ANDROID
             plugin?.Dispose();
             plugin = null;
+#endif
 
             if (receiver != null)
             {
