@@ -78,6 +78,16 @@ Frame path (proven V1 pipeline): passthrough texture → blit to ≤640x480 →
 GPU RGB→I420 (BT.601 compute shader) → async readback (latest-frame-wins) →
 JNI → `PixelDataVideoCapturer` → hardware encoder.
 
+### Stream orientation
+
+The GPU readback convention delivers frames vertically flipped on-device (the
+reason the V1 server defaulted `QVS_FLIP_VERTICAL=true`). The V2 client
+corrects this **at source** — the flip is folded into the pump's existing blit
+(`WebRTCServiceProfile.FlipStreamVertically`, default on), so the stream
+arrives upright and the wire stays truthful for dumps/recordings/other
+consumers. **Run the server with `QVS_FLIP_VERTICAL=false`.** The detection
+`invertY` stays true either way — that converts image y-down to viewport y-up,
+independent of stream orientation.
 ## Startup flow (warm-up screen)
 
 Streaming does not start on launch. A head-locked warm-up panel shows live

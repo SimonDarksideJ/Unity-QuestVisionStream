@@ -86,7 +86,7 @@ namespace QuestVisionStream.Services
             signaling.CandidateReceived += OnCandidateReceived;
             signaling.Connected += OnSignalingConnected;
 
-            pump = new YuvFramePump(profile.UseGpuYuvConversion);
+            pump = new YuvFramePump(profile.UseGpuYuvConversion, profile.FlipStreamVertically);
 
             var transport = Transport;
             if (transport == null)
