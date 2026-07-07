@@ -32,6 +32,10 @@ export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0   # use full unified memory
 export QVS_DETECTOR="$DETECTOR"
 export QVS_ENABLE_DISPLAY="${QVS_ENABLE_DISPLAY:-false}"
 export QVS_ENABLE_TURN="${QVS_ENABLE_TURN:-false}"
+# Machine-readable detection log (one JSON line per payload sent to the client),
+# for frame-for-frame comparison against a client-side capture. Set
+# QVS_DETECTION_LOG to override the path, or to "" to disable.
+export QVS_DETECTION_LOG="${QVS_DETECTION_LOG:-detections.jsonl}"
 
 echo "Starting QuestVisionStream (detector=$DETECTOR)..."
 exec python -m questvisionstream "$@"

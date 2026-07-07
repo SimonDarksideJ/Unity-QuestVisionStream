@@ -70,6 +70,18 @@ class ServerConfig:
     enable_display: bool = field(default_factory=lambda: _env_bool("QVS_ENABLE_DISPLAY", False))
     log_interval: int = field(default_factory=lambda: _env_int("QVS_LOG_INTERVAL", 30, minimum=1))
 
+    # Separate machine-readable detection log. When set to a path, every payload
+    # sent to a client is appended as one JSON line (see detection_log.py) for
+    # frame-for-frame comparison against a client-side capture. Empty = disabled;
+    # the launch scripts default it next to server.log.
+    detection_log: str = field(default_factory=lambda: _env_str("QVS_DETECTION_LOG", ""))
+
+    # libav/libswscale (PyAV) console verbosity. Default "error" silences the
+    # benign, per-frame "[swscaler] No accelerated colorspace conversion from
+    # yuv420p to bgr24" WARNING that otherwise floods the log; set "warning" or
+    # higher to bring ffmpeg diagnostics back.
+    ffmpeg_log_level: str = field(default_factory=lambda: _env_str("QVS_FFMPEG_LOG_LEVEL", "error"))
+
     # Session security. All default open for trusted-LAN use; set them when the
     # server is reachable beyond the LAN (tunnel, port-forward, public host).
     #

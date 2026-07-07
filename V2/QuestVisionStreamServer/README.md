@@ -64,6 +64,7 @@ Health: `curl http://localhost:8080/` → `{"status":"ok","detector":"yolo","con
 | `QVS_ALLOWED_ORIGINS` | *(unset = any)* | Comma-separated `Origin` allowlist for the signaling WS |
 | `QVS_MAX_CONNECTIONS` | `1` | Session cap; a new connection supersedes the oldest |
 | `QVS_LOG_INTERVAL` | `30` | Frames between FPS log lines (clamped ≥ 1) |
+| `QVS_DETECTION_LOG` | *(unset = off; launch scripts default it)* | Path to a JSONL detection log — one line per payload sent to the client, for client-side comparison |
 
 > **Exposing the server beyond the LAN?** Set `QVS_AUTH_TOKEN` (append
 > `?token=…` to the signaling URL the client dials) and `QVS_ALLOWED_ORIGINS`
@@ -95,6 +96,25 @@ it, and future clients can use it to correlate detections with the exact capture
 frame (the groundwork for capture-pose alignment). `frame` counts frames
 *received*, so under load its gaps show how many stale frames were skipped by the
 latest-frame-wins scheduler.
+
+### Detection log (server-side, for client comparison)
+
+Set `QVS_DETECTION_LOG` (the launch scripts default it to `.run/detections.jsonl`
+beside `server.log`) and the server appends **one JSON line per payload it sends
+to a client** — the machine-readable counterpart to the throttled `[QVS ↓]`
+console summary. Each line wraps the exact wire payload plus send-side metadata:
+
+```json
+{"ts":"2026-07-06T18:57:01.123456+00:00","t_mono":950247.48,
+ "client":"user@example.com","count":1,
+ "payload":{"type":"detections","frame":123,"pts":369000,"width":640,"height":480,
+            "detections":[{"label":"cup","conf":0.82,"bbox":[x1,y1,x2,y2]}]}}
+```
+
+`payload` is byte-faithful to what the client receives, so a client-side capture
+can be diffed against it on `frame`/`pts`. The file is truncated per server run
+(like `server.log`); lines are logged only on a successful data-channel send, so
+it mirrors the wire rather than intent. `tail -f` shows detections live.
 
 ## Behaviour under load
 

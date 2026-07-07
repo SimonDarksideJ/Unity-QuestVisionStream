@@ -35,6 +35,7 @@ from aiortc import (
 from aiortc.sdp import candidate_from_sdp
 
 from .config import ServerConfig
+from .detection_log import create_detection_log
 from .video_processor import VideoProcessor
 
 
@@ -125,6 +126,9 @@ class WebRTCServer:
         self.pcs: set[RTCPeerConnection] = set()
         # Oldest-first (websocket, pc, cid) tuples for reconnect-replace + cap.
         self.sessions: list[tuple[object, RTCPeerConnection, str]] = []
+        # Optional JSONL log of every payload sent to a client (None = disabled).
+        # Shared across connections; each record carries the client identity.
+        self.detection_log = create_detection_log(config.detection_log)
 
     # ------------------------------------------------------------ gating ----
 
@@ -205,6 +209,11 @@ class WebRTCServer:
                     detections_channel.send(json.dumps(payload))
                 except Exception as exc:
                     print(f"[WebRTC] DC send failed: {exc}")
+                    return
+                # Record exactly what the client received (logged only on a
+                # successful send, so the file mirrors the wire, not intent).
+                if self.detection_log is not None and payload.get("type") == "detections":
+                    self.detection_log.log(client, payload)
 
         processor.send = send_over_dc
 
@@ -331,3 +340,5 @@ class WebRTCServer:
         await asyncio.gather(*(pc.close() for pc in self.pcs), return_exceptions=True)
         self.pcs.clear()
         self.sessions.clear()
+        if self.detection_log is not None:
+            self.detection_log.close()

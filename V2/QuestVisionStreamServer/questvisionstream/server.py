@@ -8,7 +8,7 @@ from dataclasses import replace
 from .config import ServerConfig, load_config
 from .detectors import DETECTOR_NAMES, get_detector
 from .health import start_health_server
-from .video_processor import VideoProcessor
+from .video_processor import VideoProcessor, configure_ffmpeg_logging
 from .webrtc_server import WebRTCServer
 
 
@@ -28,6 +28,20 @@ async def run() -> None:
     config = replace(config, detector=args.detector, host=args.host, port=args.port)
 
     print(f"QuestVisionStream Server | detector={config.detector} | display={config.enable_display}")
+
+    # Quiet libswscale's benign per-frame "no accelerated colorspace conversion"
+    # WARNING before any frame is decoded (see configure_ffmpeg_logging).
+    configure_ffmpeg_logging(config.ffmpeg_log_level)
+
+    # Import cv2 now, on the main thread during boot. It is otherwise imported
+    # lazily inside _preprocess on the inference worker thread on the FIRST
+    # frame — a ~100–160ms, GIL-holding import that stalls the event loop
+    # (signaling/keepalives/other peers) mid-session. Best-effort: the lazy
+    # import still covers environments where cv2 is unavailable.
+    try:
+        import cv2  # noqa: F401
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        print(f"[Server] cv2 pre-import skipped ({exc}); will import lazily")
 
     # Load the model once and share it across connections. Stateful detectors
     # (florence2, body) assume a single active stream — QVS_MAX_CONNECTIONS

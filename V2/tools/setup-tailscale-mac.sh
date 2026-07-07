@@ -264,9 +264,11 @@ cd "$SERVER_DIR"
 # PYTHONUNBUFFERED=1 forces line/stream flushing — otherwise Python block-buffers
 # stdout when it's a file (not a TTY) and the [QVS] logs appear in laggy bursts.
 QVS_PORT="$SIGNAL_PORT" QVS_HEALTH_PORT="$HEALTH_PORT" PYTHONUNBUFFERED=1 \
+  QVS_DETECTION_LOG="${QVS_DETECTION_LOG:-$RUN_DIR/detections.jsonl}" \
   nohup ./run-local.sh > "$RUN_DIR/server.log" 2>&1 &
 SERVER_PID=$!
 info "server.log → $RUN_DIR/server.log (pid $SERVER_PID)"
+info "detections → ${QVS_DETECTION_LOG:-$RUN_DIR/detections.jsonl} (JSONL, one line per payload sent to the client)"
 
 if $DETACH; then trap - INT TERM EXIT; else trap cleanup INT TERM EXIT; fi
 

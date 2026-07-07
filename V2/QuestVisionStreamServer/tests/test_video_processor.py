@@ -44,6 +44,11 @@ async def test_inference_does_not_stall_event_loop(collected_payloads):
     Off-loop inference should keep the stall well under 25ms.
     """
     config = make_config(QVS_ENABLE_DISPLAY="false")
+    # Warm cv2 up front (the server does this at boot; see server.run). Otherwise
+    # the first frame's lazy `import cv2` runs on the worker thread and holds the
+    # GIL for ~100–160ms — a one-time cold-import stall that has nothing to do
+    # with whether *inference* is offloaded, which is what this test measures.
+    import cv2  # noqa: F401
     n_frames = 8
     # Paced slower than inference so every frame is processed (no drops) and
     # the monitor observes the loop across 8 consecutive forward passes.

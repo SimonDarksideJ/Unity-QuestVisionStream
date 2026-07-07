@@ -44,6 +44,34 @@ def _get_inference_pool() -> ThreadPoolExecutor:
     return _inference_pool
 
 
+def configure_ffmpeg_logging(level: str) -> None:
+    """Set the global libav/libswscale log threshold (PyAV).
+
+    ``frame.to_ndarray("bgr24")`` builds a fresh libswscale context per frame,
+    and each one emits a one-off ``[swscaler] No accelerated colorspace
+    conversion found from yuv420p to bgr24`` at WARNING level — thousands of
+    identical, benign lines that bury the real logs. Dropping the threshold to
+    ``error`` (the default) suppresses these while keeping genuine ffmpeg errors.
+    Best-effort: a missing/renamed API must never stop the server starting.
+    """
+    try:
+        import av.logging as av_log
+
+        levels = {
+            "quiet": av_log.PANIC,
+            "panic": av_log.PANIC,
+            "fatal": av_log.FATAL,
+            "error": av_log.ERROR,
+            "warning": av_log.WARNING,
+            "info": av_log.INFO,
+            "verbose": av_log.VERBOSE,
+            "debug": av_log.DEBUG,
+        }
+        av_log.set_level(levels.get((level or "").strip().lower(), av_log.ERROR))
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[VideoProcessor] Could not set ffmpeg log level {level!r}: {exc}")
+
+
 class VideoProcessor:
     def __init__(self, config: ServerConfig, detect: DetectFn, send: SendFn) -> None:
         self.config = config
