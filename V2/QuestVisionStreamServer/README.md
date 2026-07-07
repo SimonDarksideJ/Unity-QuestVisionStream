@@ -99,10 +99,9 @@ latest-frame-wins scheduler.
 
 ### Detection log (server-side, for client comparison)
 
-Set `QVS_DETECTION_LOG` (the launch scripts default it to `.run/detections.jsonl`
-beside `server.log`) and the server appends **one JSON line per payload it sends
-to a client** — the machine-readable counterpart to the throttled `[QVS ↓]`
-console summary. Each line wraps the exact wire payload plus send-side metadata:
+The server can write **one JSON line per payload it sends to a client** — the
+machine-readable counterpart to the throttled `[QVS ↓]` console summary. Each
+line wraps the exact wire payload plus send-side metadata:
 
 ```json
 {"ts":"2026-07-06T18:57:01.123456+00:00","t_mono":950247.48,
@@ -112,9 +111,22 @@ console summary. Each line wraps the exact wire payload plus send-side metadata:
 ```
 
 `payload` is byte-faithful to what the client receives, so a client-side capture
-can be diffed against it on `frame`/`pts`. The file is truncated per server run
-(like `server.log`); lines are logged only on a successful data-channel send, so
-it mirrors the wire rather than intent. `tail -f` shows detections live.
+can be diffed against it. Lines are logged only on a successful data-channel
+send, so the file mirrors the wire, not intent. `tail -f` shows detections live.
+
+**Two placement modes, by precedence:**
+
+1. **Per-connection folders (preferred).** When `QVS_DUMP_DIR` is set, each
+   connection gets its own subfolder `‹QVS_DUMP_DIR›/‹YYYYMMDD-HHMMSS›_‹client›/`
+   holding **both** its `detections.jsonl` **and** its captured frame JPEGs. The
+   folder is created lazily on the first capture, so idle/probe connections leave
+   nothing behind. Because `frame`/`pts` reset per WebRTC connection, this keeps
+   every session's data self-contained and collision-free — correlate the log
+   against the co-located frames within one folder.
+2. **Single shared file (fallback).** When `QVS_DUMP_DIR` is *unset* but
+   `QVS_DETECTION_LOG` is set (the launch scripts default it to
+   `.run/detections.jsonl`), all connections in a run append to that one file,
+   truncated per server run like `server.log`.
 
 ## Behaviour under load
 

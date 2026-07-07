@@ -268,7 +268,11 @@ QVS_PORT="$SIGNAL_PORT" QVS_HEALTH_PORT="$HEALTH_PORT" PYTHONUNBUFFERED=1 \
   nohup ./run-local.sh > "$RUN_DIR/server.log" 2>&1 &
 SERVER_PID=$!
 info "server.log → $RUN_DIR/server.log (pid $SERVER_PID)"
-info "detections → ${QVS_DETECTION_LOG:-$RUN_DIR/detections.jsonl} (JSONL, one line per payload sent to the client)"
+if [[ -n "${QVS_DUMP_DIR:-}" ]]; then
+  info "detections + frame captures → per-connection folders under $QVS_DUMP_DIR/<time>_<client>/"
+else
+  info "detections → ${QVS_DETECTION_LOG:-$RUN_DIR/detections.jsonl} (JSONL, one line per payload sent to the client)"
+fi
 
 if $DETACH; then trap - INT TERM EXIT; else trap cleanup INT TERM EXIT; fi
 

@@ -21,6 +21,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
+from datetime import datetime
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -126,9 +129,14 @@ class WebRTCServer:
         self.pcs: set[RTCPeerConnection] = set()
         # Oldest-first (websocket, pc, cid) tuples for reconnect-replace + cap.
         self.sessions: list[tuple[object, RTCPeerConnection, str]] = []
-        # Optional JSONL log of every payload sent to a client (None = disabled).
-        # Shared across connections; each record carries the client identity.
-        self.detection_log = create_detection_log(config.detection_log)
+        # Capture layout. When a base capture dir is configured, each connection
+        # gets its OWN folder (captures + detection log together) — so nothing
+        # collides across sessions; the shared single-file log is the fallback
+        # used only when no capture dir is set.
+        self._capture_base = config.capture_dir.strip()
+        self.detection_log = (
+            None if self._capture_base else create_detection_log(config.detection_log)
+        )
 
     # ------------------------------------------------------------ gating ----
 
@@ -177,6 +185,17 @@ class WebRTCServer:
             print("[WebRTC] Connection cap reached — superseding oldest session")
             await self._close_session(old_ws, old_pc, 4000, "superseded by a newer connection")
 
+    def _session_dir(self, client: str) -> str:
+        """Path of this connection's capture folder: ``<base>/<start>_<client>``.
+
+        Named by connection start time + client so sessions never collide.
+        Returns the path only — the folder is created lazily on the first
+        capture/log write (so connections that never stream leave no empty
+        folders)."""
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", client).strip("_") or "client"
+        return os.path.join(self._capture_base, f"{stamp}_{safe}")
+
     # ----------------------------------------------------------- session ----
 
     async def handle_signaling(self, websocket) -> None:
@@ -199,6 +218,19 @@ class WebRTCServer:
         self.sessions.append(session)
 
         processor: VideoProcessor = self.make_processor()
+
+        # Per-connection capture folder (created lazily on first write): give THIS
+        # connection its own dated, client-named subfolder holding both its frame
+        # dumps and its detection log, so sessions never collide. Falls back to
+        # the shared single-file log when no capture dir is configured.
+        connection_log = None
+        if self._capture_base:
+            session_dir = self._session_dir(client)
+            processor.set_capture_dir(session_dir)
+            connection_log = create_detection_log(os.path.join(session_dir, "detections.jsonl"))
+            print(f"[QVS] Session capture → {session_dir}")
+        detection_log = connection_log if connection_log is not None else self.detection_log
+
         detections_channel: Optional[RTCDataChannel] = None
         video_tasks: list[asyncio.Task] = []
         offer_received = False
@@ -212,8 +244,8 @@ class WebRTCServer:
                     return
                 # Record exactly what the client received (logged only on a
                 # successful send, so the file mirrors the wire, not intent).
-                if self.detection_log is not None and payload.get("type") == "detections":
-                    self.detection_log.log(client, payload)
+                if detection_log is not None and payload.get("type") == "detections":
+                    detection_log.log(client, payload)
 
         processor.send = send_over_dc
 
@@ -319,6 +351,8 @@ class WebRTCServer:
             self.pcs.discard(pc)
             if session in self.sessions:
                 self.sessions.remove(session)
+            if connection_log is not None:
+                connection_log.close()
 
     async def start(self) -> None:
         print(f"[WebRTC] Signaling on ws://{self.config.host}:{self.config.port}")
