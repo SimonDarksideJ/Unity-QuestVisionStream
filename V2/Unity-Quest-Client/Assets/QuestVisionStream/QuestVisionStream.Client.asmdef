@@ -9,7 +9,9 @@
         "Unity.XR.ARFoundation",
         "Unity.XR.ARSubsystems",
         "Unity.XR.CoreUtils",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "UnityEngine.UI",
+        "XRTraining"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
