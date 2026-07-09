@@ -21,7 +21,9 @@ namespace QuestVisionStream.Client
     ///     title, description, image placeholder, action buttons) re-anchored in
     ///     front of the user on every step. Rebuilt per step, focus-card style.
     ///   - <b>Hand menu</b> — the vertical 1d strip with a live current-step
-    ///     readout, lazily following the left controller (head-relative fallback).
+    ///     readout, lazily following the left controller and shown only in the
+    ///     palm-up pose (fades in when the palm rolls toward the face, out when
+    ///     it rolls away; always visible in the Editor's untracked fallback).
     ///   - <b>Location indicator</b> — a pulsing marker at the detected box centre
     ///     with a leader-line connector up to a billboarded label pill.
     ///
@@ -37,6 +39,12 @@ namespace QuestVisionStream.Client
         private const float LabelPixelsToMetres = 0.001f;
         private const float LabelLiftMeters = 0.16f;
         private const float MenuFollowSeconds = 0.25f;
+        private const float MenuFadeSeconds = 0.15f;
+
+        // Palm-up gate with hysteresis: show when the palm rolls toward the face,
+        // keep showing until it rolls clearly away — no flicker at the boundary.
+        private const float MenuShowAboveDot = 0.55f;
+        private const float MenuHideBelowDot = 0.35f;
 
         private ThemePalette theme;
         private Action<int> onOptionPressed;
@@ -52,9 +60,11 @@ namespace QuestVisionStream.Client
         // Hand menu.
         private GameObject menuRoot;
         private HandMenu.Handle menuHandle;
+        private CanvasGroup menuGroup;
         private InputAction leftPositionAction;
         private InputAction leftRotationAction;
         private bool menuPlaced;
+        private bool menuShown;
 
         // Location indicator (marker + connector + label pill).
         private GameObject hintRoot;
@@ -266,6 +276,13 @@ namespace QuestVisionStream.Client
             strip.anchorMin = strip.anchorMax = new Vector2(0.5f, 0.5f);
             strip.pivot = new Vector2(0.5f, 0.5f);
             strip.anchoredPosition = Vector2.zero;
+
+            // Hidden until the palm-up gesture; the group also gates raycasts so
+            // an invisible menu can never swallow a press.
+            menuGroup = menuRoot.AddComponent<CanvasGroup>();
+            menuGroup.alpha = 0f;
+            menuGroup.interactable = false;
+            menuGroup.blocksRaycasts = false;
         }
 
         public void SetHandMenuStep(string eyebrow, string title) => menuHandle?.SetStep(eyebrow, title);
@@ -420,6 +437,7 @@ namespace QuestVisionStream.Client
             }
 
             Vector3 target;
+            bool wantShown;
             var handPosition = leftPositionAction.ReadValue<Vector3>();
             if (handPosition != Vector3.zero)
             {
@@ -432,14 +450,28 @@ namespace QuestVisionStream.Client
                     handRotation = trackingSpace.rotation * handRotation;
                 }
 
+                // Palm-up gate: turning the palm toward the face rolls the controller's
+                // thumb face (its up axis) toward the head. Show only in that pose.
+                var toHead = (camera.transform.position - handPosition).normalized;
+                var facing = Vector3.Dot(handRotation * Vector3.up, toHead);
+                wantShown = facing > (menuShown ? MenuHideBelowDot : MenuShowAboveDot);
+
                 // Ulnar side of the palm: a little inward and up from the grip.
                 target = handPosition + handRotation * new Vector3(0.09f, 0.03f, 0.02f);
             }
             else
             {
-                // No controller tracked (Editor) — rest at the lower left of view.
+                // No controller tracked (Editor) — rest at the lower left of view,
+                // always shown so the menu stays testable with a mouse.
                 target = camera.transform.TransformPoint(new Vector3(-0.26f, -0.18f, 0.7f));
+                wantShown = true;
             }
+
+            menuShown = wantShown;
+            var alphaTarget = menuShown ? 1f : 0f;
+            menuGroup.alpha = Mathf.MoveTowards(menuGroup.alpha, alphaTarget, Time.deltaTime / MenuFadeSeconds);
+            menuGroup.interactable = menuShown;
+            menuGroup.blocksRaycasts = menuShown;
 
             if (!menuPlaced)
             {

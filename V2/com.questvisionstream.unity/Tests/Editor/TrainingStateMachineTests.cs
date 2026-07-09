@@ -73,6 +73,8 @@ namespace QuestVisionStream.Tests
             advance = machine.Offer("foundtv", TrainingClassSource.ActionResponse);
             Assert.That(advance.Step.HasPresentation, Is.False, "no UX action, move next");
             Assert.That(machine.ExpectedClass, Is.EqualTo("person"), "immediately waiting on the next detection");
+            Assert.That(machine.CurrentDetectedClass, Is.Empty,
+                "the tv indicator unlinks when its dialog progresses — re-sightings can't resurrect it");
 
             // 4. person detected.
             advance = machine.Offer("person", TrainingClassSource.Detection);

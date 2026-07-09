@@ -108,14 +108,23 @@ Receives UX requests from the state flow and owns the training UI
   description, the shared camera/grey-backdrop image placeholder, and the
   step's action buttons. Re-anchored ~1.25 m in front of the user per step.
 - **Hand menu** — the design's vertical 1d strip with a live current-step
-  readout, lazily following the left controller (head-relative fallback in the
-  Editor). HOME/REDO restart the scenario, TASKS re-anchors the form, HINT
-  pulses the location indicator, EXIT resets to idle.
+  readout, lazily following the left controller and gated on the **palm-up
+  pose**: it fades in when the palm rolls toward the face (controller up-axis
+  toward the head, with show/hide hysteresis so it doesn't flicker) and fades
+  out — raycasts disabled — when the palm rolls away. In the Editor's
+  untracked fallback it stays visible at the lower left for mouse testing.
+  HOME/REDO restart the scenario, TASKS re-anchors the form, HINT pulses the
+  location indicator, EXIT resets to idle.
 - **Location indicator** — when a step carries `detectedClass` + `label`, a
   pulsing marker is placed at the detection's box centre by unprojecting the
   normalized centre through the **capture-time pose snapshot** (same
   pose-freeze primitive as the box renderer, same fixed distance so label and
   box coincide), with a leader-line connector up to a billboarded label pill.
+  Each indicator is linked to its step's dialog: when the dialog progresses,
+  the next `StepActivated` re-binds the indicator to the new step's label or
+  hides it (pass-through steps, completion, restart, exit), and the state
+  machine clears its cached detected class on every advance so stale
+  re-sightings can never resurrect an old indicator.
 - **Interaction** — uGUI buttons work with a pointer; in-headset the
   right-controller **A** presses the form's first action. The scenario begins
   automatically on the server's `ready` handshake (after the warm-up screen has
