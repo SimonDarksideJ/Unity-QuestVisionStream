@@ -27,7 +27,8 @@ namespace QuestVisionStream.Services
         private YuvFramePump pump;
         private WebRTCConnectionState state = WebRTCConnectionState.New;
         private bool sessionRequested;
-        private bool everAttempted;
+        private bool hadSignalingDrop;
+        private bool firstFramePushed;
         private float reconnectAtRealtime = -1f;
         private int frameCounter;
 
@@ -86,6 +87,7 @@ namespace QuestVisionStream.Services
             signaling.AnswerReceived += OnAnswerReceived;
             signaling.CandidateReceived += OnCandidateReceived;
             signaling.Connected += OnSignalingConnected;
+            signaling.Disconnected += OnSignalingDisconnected;
 
             pump = new YuvFramePump(profile.UseGpuYuvConversion, profile.FlipStreamVertically);
 
@@ -168,6 +170,14 @@ namespace QuestVisionStream.Services
                 }
 
                 pump.PumpFrame(camera.SourceTexture, transport);
+
+                // Consent audit: the log proves exactly when pixels first left the
+                // device this session — it must always be after "frames enabled".
+                if (!firstFramePushed)
+                {
+                    firstFramePushed = true;
+                    ReportDiagnostic("first camera frame pushed");
+                }
             }
         }
 
@@ -183,6 +193,20 @@ namespace QuestVisionStream.Services
             Debug.Log("[QVS:WebRTC] Restarting session");
             transport.CloseSession();
             sessionRequested = false;
+
+            // The server accepts exactly ONE offer per signaling socket (a fresh
+            // socket reads as a same-client reconnect and cleanly replaces the old
+            // session server-side), so renegotiation must cycle the socket — a
+            // second offer on the same socket is silently ignored and the session
+            // would hang at "negotiating" forever. Only cycle a live socket: when
+            // signaling is already down (drop, or a deliberate 4000/4001 eviction)
+            // its own reconnect policy decides if/when it comes back.
+            if (signaling.IsConnected)
+            {
+                signaling.Disconnect();
+                signaling.Connect();
+            }
+
             // Update() re-enters BeginSession once camera + signaling are ready again.
         }
 
@@ -192,6 +216,7 @@ namespace QuestVisionStream.Services
             signaling.AnswerReceived -= OnAnswerReceived;
             signaling.CandidateReceived -= OnCandidateReceived;
             signaling.Connected -= OnSignalingConnected;
+            signaling.Disconnected -= OnSignalingDisconnected;
 
             Transport?.CloseSession();
             pump?.Dispose();
@@ -203,7 +228,7 @@ namespace QuestVisionStream.Services
         private void BeginSession(IWebRTCTransportModule transport)
         {
             sessionRequested = true;
-            everAttempted = true;
+            firstFramePushed = false;
             frameCounter = 0;
 
             var resolution = camera.StreamResolution;
@@ -238,13 +263,22 @@ namespace QuestVisionStream.Services
 
         private void OnCandidateReceived(IceCandidateMessage candidate) => Transport?.AddRemoteCandidate(candidate);
 
+        private void OnSignalingDisconnected(int code) => hadSignalingDrop = true;
+
         private void OnSignalingConnected()
         {
-            // Signaling came back after a drop: if our session never completed (or died
-            // with it), the server no longer knows us — renegotiate.
-            if (everAttempted && state != WebRTCConnectionState.Connected)
+            // Only a signaling connection that came back AFTER A REAL DROP while a
+            // session was in flight warrants renegotiation (the server no longer
+            // knows us). The first connect must never trigger this: with eager
+            // session start, Update() can poll IsConnected and send the offer
+            // before this event dispatches — treating that as "restored" used to
+            // kill the brand-new session mid-negotiation.
+            var dropped = hadSignalingDrop;
+            hadSignalingDrop = false;
+
+            if (dropped && sessionRequested && state != WebRTCConnectionState.Connected)
             {
-                ScheduleReconnect("signaling restored");
+                ScheduleReconnect("signaling restored after drop");
             }
         }
 
