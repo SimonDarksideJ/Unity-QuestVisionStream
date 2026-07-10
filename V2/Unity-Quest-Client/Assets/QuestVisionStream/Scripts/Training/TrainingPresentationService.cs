@@ -29,13 +29,13 @@ namespace QuestVisionStream.Client
         private float labelPlacementDistanceMeters = 2f;
 
         [SerializeField]
-        [Tooltip("Start the scenario automatically when the server's ready handshake arrives on the detections channel.")]
-        private bool beginOnServerReady = true;
+        [Tooltip("Start the scenario automatically once streaming begins — on WebRTC connect (the moment after Enter) or the server's ready handshake, whichever lands first.")]
+        private bool autoBegin = true;
 
         public int ThemeIndex { get => themeIndex; set => themeIndex = value; }
         public float FormDistanceMeters { get => formDistanceMeters; set => formDistanceMeters = value; }
         public float LabelPlacementDistanceMeters { get => labelPlacementDistanceMeters; set => labelPlacementDistanceMeters = value; }
-        public bool BeginOnServerReady { get => beginOnServerReady; set => beginOnServerReady = value; }
+        public bool AutoBegin { get => autoBegin; set => autoBegin = value; }
     }
 
     /// <summary>
@@ -54,6 +54,7 @@ namespace QuestVisionStream.Client
         private readonly ITrainingStateService training;
         private readonly IDetectionService detections;
         private readonly IPoseTrackingService poseTracking;
+        private readonly IWebRTCService webrtc;
         private TrainingUxController controller;
 
         public TrainingPresentationService(
@@ -62,13 +63,15 @@ namespace QuestVisionStream.Client
             TrainingPresentationServiceProfile profile,
             ITrainingStateService training,
             IDetectionService detections,
-            IPoseTrackingService poseTracking)
+            IPoseTrackingService poseTracking,
+            IWebRTCService webrtc)
             : base(name, priority)
         {
             this.profile = profile != null ? profile : throw new ArgumentNullException(nameof(profile));
             this.training = training ?? throw new ArgumentNullException(nameof(training));
             this.detections = detections ?? throw new ArgumentNullException(nameof(detections));
             this.poseTracking = poseTracking ?? throw new ArgumentNullException(nameof(poseTracking));
+            this.webrtc = webrtc ?? throw new ArgumentNullException(nameof(webrtc));
         }
 
         public bool IsFormVisible => controller != null && controller.IsFormVisible;
@@ -100,7 +103,19 @@ namespace QuestVisionStream.Client
             training.StepActivated += OnStepActivated;
             training.CurrentClassSighted += OnCurrentClassSighted;
             training.ScenarioCompleted += OnScenarioCompleted;
+
+            // Auto-begin the moment streaming starts (the user pressed Enter). The
+            // server's ready handshake stays wired as a fallback trigger — it is a
+            // single-shot message that can be lost in the channel-open race, so it
+            // must not be the only way the training starts.
+            webrtc.StateChanged += OnWebRTCStateChanged;
             detections.ServerReady += OnServerReady;
+
+            // Streaming already live (e.g. this service registered late)? Begin now.
+            if (webrtc.State == WebRTCConnectionState.Connected)
+            {
+                AutoBegin();
+            }
         }
 
         /// <inheritdoc />
@@ -110,6 +125,7 @@ namespace QuestVisionStream.Client
             training.StepActivated -= OnStepActivated;
             training.CurrentClassSighted -= OnCurrentClassSighted;
             training.ScenarioCompleted -= OnScenarioCompleted;
+            webrtc.StateChanged -= OnWebRTCStateChanged;
             detections.ServerReady -= OnServerReady;
 
             if (controller != null)
@@ -153,9 +169,19 @@ namespace QuestVisionStream.Client
 
         // ---------------------------------------------------------- flow events
 
-        private void OnServerReady()
+        private void OnWebRTCStateChanged(WebRTCConnectionState state)
         {
-            if (profile.BeginOnServerReady && training.Status == TrainingFlowStatus.Idle)
+            if (state == WebRTCConnectionState.Connected)
+            {
+                AutoBegin();
+            }
+        }
+
+        private void OnServerReady() => AutoBegin();
+
+        private void AutoBegin()
+        {
+            if (profile.AutoBegin && training.Status == TrainingFlowStatus.Idle)
             {
                 training.Begin();
             }

@@ -134,8 +134,10 @@ Receives UX requests from the state flow and owns the training UI
   warm-up Enter card, the step form, the hand menu — registers a
   `TrackedDeviceRaycaster` through `ControllerUiPointer.RegisterCanvas`. The
   right-controller **A** remains a shortcut for the form's first action. The
-  scenario begins automatically on the server's `ready` handshake (after the
-  warm-up screen has started streaming), so it never fights the warm-up flow.
+  scenario begins automatically the moment streaming starts — on WebRTC
+  connect (right after the user presses Enter), with the server's `ready`
+  handshake kept as a fallback trigger — so the welcome form appears
+  immediately after the warm-up screen and never fights it.
 
 Both services are registered code-first in `QuestVisionStreamBootstrap`
 (priorities 45/46) behind the `enableTraining` toggle, alongside a
