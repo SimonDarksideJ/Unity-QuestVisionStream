@@ -104,18 +104,16 @@ namespace QuestVisionStream.Client
             training.CurrentClassSighted += OnCurrentClassSighted;
             training.ScenarioCompleted += OnScenarioCompleted;
 
-            // Auto-begin the moment streaming starts (the user pressed Enter). The
-            // server's ready handshake stays wired as a fallback trigger — it is a
-            // single-shot message that can be lost in the channel-open race, so it
-            // must not be the only way the training starts.
+            // Auto-begin the moment the user enters: the session is negotiated
+            // during warm-up, so "Enter pressed" (StreamingBegan) is the normal
+            // trigger; the state change and the server's ready handshake stay
+            // wired for the rare orders where Enter lands before Connected.
+            webrtc.StreamingBegan += OnStreamingBegan;
             webrtc.StateChanged += OnWebRTCStateChanged;
             detections.ServerReady += OnServerReady;
 
-            // Streaming already live (e.g. this service registered late)? Begin now.
-            if (webrtc.State == WebRTCConnectionState.Connected)
-            {
-                AutoBegin();
-            }
+            // Already entered and connected (e.g. this service registered late)?
+            AutoBegin();
         }
 
         /// <inheritdoc />
@@ -125,6 +123,7 @@ namespace QuestVisionStream.Client
             training.StepActivated -= OnStepActivated;
             training.CurrentClassSighted -= OnCurrentClassSighted;
             training.ScenarioCompleted -= OnScenarioCompleted;
+            webrtc.StreamingBegan -= OnStreamingBegan;
             webrtc.StateChanged -= OnWebRTCStateChanged;
             detections.ServerReady -= OnServerReady;
 
@@ -169,6 +168,8 @@ namespace QuestVisionStream.Client
 
         // ---------------------------------------------------------- flow events
 
+        private void OnStreamingBegan() => AutoBegin();
+
         private void OnWebRTCStateChanged(WebRTCConnectionState state)
         {
             if (state == WebRTCConnectionState.Connected)
@@ -181,7 +182,14 @@ namespace QuestVisionStream.Client
 
         private void AutoBegin()
         {
-            if (profile.AutoBegin && training.Status == TrainingFlowStatus.Idle)
+            // Both gates: the user pressed Enter (frames enabled) AND the session
+            // is connected. Negotiation happens during warm-up, so normally both
+            // are already true the instant Enter is pressed — the welcome form
+            // appears immediately, never behind the warm-up card.
+            if (profile.AutoBegin &&
+                training.Status == TrainingFlowStatus.Idle &&
+                webrtc.StreamingRequested &&
+                webrtc.State == WebRTCConnectionState.Connected)
             {
                 training.Begin();
             }

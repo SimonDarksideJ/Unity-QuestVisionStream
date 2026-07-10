@@ -53,7 +53,7 @@ namespace QuestVisionStream.Services
 
         [Header("Session")]
         [SerializeField]
-        [Tooltip("Start streaming as soon as camera + signaling are ready. Disable for a warm-up screen: the session then waits for IWebRTCService.BeginStreaming().")]
+        [Tooltip("Push frames as soon as the session connects. Disable for a warm-up screen: the session still negotiates eagerly (connection warmed and READY), but no frames leave the device until IWebRTCService.BeginStreaming().")]
         private bool autoStartSession = true;
 
         [Header("Recovery")]

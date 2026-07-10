@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- **Warm connection launch pattern**: `WebRTCService` now negotiates the
+  session eagerly (as soon as camera + signaling are ready — i.e. behind the
+  warm-up screen) and `AutoStartSession`/`BeginStreaming()` gate only the
+  frame pump: no camera pixels leave the device until the user confirms, but
+  the peer connection, data channel and ICE are warmed and READY by the time
+  Enter lights up. New `IWebRTCService.StreamingBegan` event signals the
+  user's confirm.
+
 - **Training flow** (`Runtime/Training/`, `Runtime/Services/Training/`): the
   authoritative training state queue driven by detections.
   - `TrainingScenario` / `TrainingScenarioParser` — the scenario queue's JSON

@@ -133,11 +133,28 @@ Receives UX requests from the state flow and owns the training UI
   works through the same module). Every interactive world-space canvas — the
   warm-up Enter card, the step form, the hand menu — registers a
   `TrackedDeviceRaycaster` through `ControllerUiPointer.RegisterCanvas`. The
-  right-controller **A** remains a shortcut for the form's first action. The
-  scenario begins automatically the moment streaming starts — on WebRTC
-  connect (right after the user presses Enter), with the server's `ready`
-  handshake kept as a fallback trigger — so the welcome form appears
-  immediately after the warm-up screen and never fights it.
+  right-controller **A** remains a shortcut for the form's first action.
+
+## Launch pattern
+
+The whole connection warms up **behind the intro card**, so entering is
+instant:
+
+1. **App launch** — signaling socket connects, passthrough camera activates,
+   and the WebRTC session negotiates immediately (peer connection, `detections`
+   data channel, ICE). No camera frames leave the device yet — consent gates
+   the frames, not the plumbing.
+2. **Warm-up card** — button tiers: `Checking camera…` → `Connecting…`
+   (signaling) → `Negotiating…` (session warming) → **`Enter`**, which only
+   lights up when the peer connection reports Connected. By the time the user
+   can press it, the pipeline is READY.
+3. **Enter** (laser click or A) — the frame pump starts (first pixels leave
+   the device now), the card hides, and the training scenario auto-begins:
+   the Welcome form appears immediately. Auto-begin requires both gates —
+   user entered **and** session connected — with the server `ready` handshake
+   as an extra trigger for unusual orderings.
+4. **Begin** on the Welcome form — detections are already flowing, so step 2
+   ("Look for a Monitor") is live detection from the first second.
 
 Both services are registered code-first in `QuestVisionStreamBootstrap`
 (priorities 45/46) behind the `enableTraining` toggle, alongside a

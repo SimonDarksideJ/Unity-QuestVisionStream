@@ -173,7 +173,17 @@ namespace QuestVisionStream.Client
                 return;
             }
 
-            // Tier 3+ — connection-driven, verbatim from the web intro.
+            // Tier 3 — the session negotiates during this warm-up screen, so Enter
+            // only lights up once the peer connection is fully warmed: by the time
+            // the user can press it, frames flow instantly.
+            if (conn == Conn.Connected && webrtc.State != WebRTCConnectionState.Connected)
+            {
+                SetButton("Negotiating…", false);
+                SetNote("Warming up the vision stream…", false);
+                return;
+            }
+
+            // Tier 4 — connection-driven, verbatim from the web intro.
             SetButton(conn == Conn.Connecting ? "Connecting…" : "Enter", conn == Conn.Connected);
 
             if (conn == Conn.Connected)
@@ -211,6 +221,8 @@ namespace QuestVisionStream.Client
         {
             if (!starting)
             {
+                // Warm-up negotiation progress — flips Negotiating… ⇄ Enter.
+                Render();
                 return;
             }
 
@@ -241,6 +253,16 @@ namespace QuestVisionStream.Client
             starting = true;
             Render();
             webrtc.BeginStreaming();
+
+            // The session was negotiated during warm-up, so Connected is normally
+            // already true here — enter immediately instead of waiting for a state
+            // change that will never fire.
+            if (webrtc.State == WebRTCConnectionState.Connected)
+            {
+                starting = false;
+                started = true;
+                Render();
+            }
         }
 
         private void SetButton(string label, bool enabled)

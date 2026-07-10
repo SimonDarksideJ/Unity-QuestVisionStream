@@ -405,7 +405,9 @@ namespace QuestVisionStream.Client
             webrtcProfile.TargetFps = targetFps;
             webrtcProfile.SendEveryNthFrame = sendEveryNthFrame;
             webrtcProfile.GateStreamingOnQuality = gateStreamingOnQuality;
-            // Warm-up screen: nothing streams until the user confirms with (A).
+            // Warm-up screen: the session negotiates eagerly (connection warmed and
+            // READY behind the card), but no camera frames leave the device until
+            // the user confirms with Enter / (A).
             webrtcProfile.AutoStartSession = false;
             serviceManager.TryCreateAndRegisterService<IWebRTCService>(
                 typeof(WebRTCService), out var webrtcService, "WebRTC", 20u, webrtcProfile);
