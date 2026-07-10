@@ -107,24 +107,24 @@ namespace QuestVisionStream.Client
             actionMap = new InputActionMap("QVS UI");
 
             // Editor / flat-screen pointer.
-            var point = actionMap.AddAction("point", InputActionType.PassThrough, expectedControlType: "Vector2");
+            var point = actionMap.AddAction("point", InputActionType.PassThrough, expectedControlLayout: "Vector2");
             point.AddBinding("<Mouse>/position");
 
-            var click = actionMap.AddAction("click", InputActionType.PassThrough, expectedControlType: "Button");
+            var click = actionMap.AddAction("click", InputActionType.PassThrough, expectedControlLayout: "Button");
             click.AddBinding("<Mouse>/leftButton");
             // Trigger = select on the pointing controller (control name differs across layouts — bind both).
             click.AddBinding("<XRController>{RightHand}/triggerPressed");
             click.AddBinding("<XRController>{RightHand}/triggerButton");
 
-            var scroll = actionMap.AddAction("scroll", InputActionType.PassThrough, expectedControlType: "Vector2");
+            var scroll = actionMap.AddAction("scroll", InputActionType.PassThrough, expectedControlLayout: "Vector2");
             scroll.AddBinding("<Mouse>/scroll");
 
             // The OpenXR AIM pose — the OS-tuned pointing ray (the grip/device pose
             // points up through the controller ring and feels wrong for aiming).
-            aimPosition = actionMap.AddAction("aimPosition", InputActionType.PassThrough, expectedControlType: "Vector3");
+            aimPosition = actionMap.AddAction("aimPosition", InputActionType.PassThrough, expectedControlLayout: "Vector3");
             aimPosition.AddBinding("<XRController>{RightHand}/pointerPosition");
 
-            aimRotation = actionMap.AddAction("aimRotation", InputActionType.PassThrough, expectedControlType: "Quaternion");
+            aimRotation = actionMap.AddAction("aimRotation", InputActionType.PassThrough, expectedControlLayout: "Quaternion");
             aimRotation.AddBinding("<XRController>{RightHand}/pointerRotation");
 
             module.point = InputActionReference.Create(point);
