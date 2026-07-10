@@ -125,10 +125,17 @@ Receives UX requests from the state flow and owns the training UI
   hides it (pass-through steps, completion, restart, exit), and the state
   machine clears its cached detected class on every advance so stale
   re-sightings can never resurrect an old indicator.
-- **Interaction** — uGUI buttons work with a pointer; in-headset the
-  right-controller **A** presses the form's first action. The scenario begins
-  automatically on the server's `ready` handshake (after the warm-up screen has
-  started streaming), so it never fights the warm-up's A-to-Enter.
+- **Interaction** — controller-only for now (hand tracking comes later). One
+  `ControllerUiPointer` owns the EventSystem: an `InputSystemUIInputModule`
+  configured in code with the right controller's OpenXR **aim pose** as a
+  tracked pointer, **trigger** as select, and a laser beam so the user can see
+  what they're aiming at (no interaction-toolkit dependency; the Editor mouse
+  works through the same module). Every interactive world-space canvas — the
+  warm-up Enter card, the step form, the hand menu — registers a
+  `TrackedDeviceRaycaster` through `ControllerUiPointer.RegisterCanvas`. The
+  right-controller **A** remains a shortcut for the form's first action. The
+  scenario begins automatically on the server's `ready` handshake (after the
+  warm-up screen has started streaming), so it never fights the warm-up flow.
 
 Both services are registered code-first in `QuestVisionStreamBootstrap`
 (priorities 45/46) behind the `enableTraining` toggle, alongside a

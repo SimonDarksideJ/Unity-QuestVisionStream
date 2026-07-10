@@ -5,7 +5,6 @@ using System;
 using System.Collections;
 using QuestVisionStream.Services;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using XRTraining.Components;
@@ -37,6 +36,7 @@ namespace QuestVisionStream.Client
     {
         private const float FormPixelsToMetres = 0.0011f;
         private const float LabelPixelsToMetres = 0.001f;
+        private const float MenuPixelsToMetres = 0.0005f; // hand menu at 50% — full size read too big on the wrist
         private const float LabelLiftMeters = 0.16f;
         private const float MenuFollowSeconds = 0.25f;
         private const float MenuFadeSeconds = 0.15f;
@@ -88,7 +88,7 @@ namespace QuestVisionStream.Client
             onOptionPressed = optionPressed;
             factory = new UIFactory(theme);
 
-            EnsureEventSystem();
+            ControllerUiPointer.EnsureSetup();
             BuildHandMenu(menuActions);
 
             // A presses the form's default action — active only while a form shows.
@@ -167,7 +167,7 @@ namespace QuestVisionStream.Client
 
             formCanvas = formRoot.AddComponent<Canvas>();
             formCanvas.renderMode = RenderMode.WorldSpace;
-            formRoot.AddComponent<GraphicRaycaster>();
+            ControllerUiPointer.RegisterCanvas(formRoot);
             formCanvasRect = (RectTransform)formRoot.transform;
             formCanvasRect.sizeDelta = new Vector2(520, 700);
             formRoot.transform.localScale = Vector3.one * FormPixelsToMetres;
@@ -266,10 +266,10 @@ namespace QuestVisionStream.Client
 
             menuCanvas = menuRoot.AddComponent<Canvas>();
             menuCanvas.renderMode = RenderMode.WorldSpace;
-            menuRoot.AddComponent<GraphicRaycaster>();
+            ControllerUiPointer.RegisterCanvas(menuRoot);
             var rect = (RectTransform)menuRoot.transform;
             rect.sizeDelta = new Vector2(96, 480);
-            menuRoot.transform.localScale = Vector3.one * LabelPixelsToMetres;
+            menuRoot.transform.localScale = Vector3.one * MenuPixelsToMetres;
 
             menuHandle = HandMenu.Build(factory, rect, actions);
             var strip = menuHandle.Root;
@@ -513,18 +513,5 @@ namespace QuestVisionStream.Client
             }
         }
 
-        private static void EnsureEventSystem()
-        {
-            if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null)
-            {
-                return;
-            }
-
-            // Editor/mouse convenience — the project runs the new Input System only,
-            // so the UI module must be the input-system one.
-            var eventSystem = new GameObject("EventSystem");
-            eventSystem.AddComponent<EventSystem>();
-            eventSystem.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
-        }
     }
 }

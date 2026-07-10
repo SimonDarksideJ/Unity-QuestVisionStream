@@ -267,6 +267,11 @@ namespace QuestVisionStream.Client
 
             var canvas = introRoot.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
+            canvas.worldCamera = Camera.main;
+            // Point-and-click on the Enter button with the controller laser; the
+            // (A) hardware shortcut stays as the fallback.
+            ControllerUiPointer.EnsureSetup();
+            ControllerUiPointer.RegisterCanvas(introRoot);
             var canvasRect = (RectTransform)introRoot.transform;
             canvasRect.sizeDelta = new Vector2(620, 400);
             introRoot.transform.localScale = Vector3.one * 0.0012f;
