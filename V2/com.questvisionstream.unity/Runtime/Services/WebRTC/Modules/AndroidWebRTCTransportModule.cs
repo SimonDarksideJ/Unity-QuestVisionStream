@@ -248,7 +248,18 @@ namespace QuestVisionStream.Services
                     break;
 
                 case "dcState":
-                    Debug.Log($"[QVS:AndroidWebRTC] DataChannel '{root.Value<string>("label")}': {root.Value<string>("state")}");
+                    var channelState = root.Value<string>("state");
+                    Debug.Log($"[QVS:AndroidWebRTC] DataChannel '{root.Value<string>("label")}': {channelState}");
+
+                    // An OPEN data channel proves the peer connection is connected —
+                    // synthesize the state in case the pcState event was lost, so a
+                    // status surface can never sit at "negotiating" over a live link.
+                    // (The service dedupes repeated states, so this is normally a no-op.)
+                    if (string.Equals(channelState, "OPEN", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ConnectionStateChanged?.Invoke(WebRTCConnectionState.Connected);
+                    }
+
                     break;
 
                 case "error":
