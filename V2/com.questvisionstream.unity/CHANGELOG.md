@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+- **Fix: eager negotiation no longer self-destructs (stuck "Negotiating…")**.
+  Three related repairs in `WebRTCService`/the Android transport:
+  - The "signaling restored" renegotiation now fires only after a REAL
+    signaling drop while a session was in flight. Previously the first-connect
+    event could race the eagerly-started session and kill it mid-negotiation.
+  - `RestartSession()` cycles the signaling socket: the server accepts exactly
+    one offer per socket (extra offers are silently ignored), so any
+    renegotiation on the same socket hung at "negotiating" forever. A fresh
+    socket reads as a same-client reconnect and cleanly replaces the session
+    server-side. (Also fixes the peer-Failed recovery path.)
+  - An OPEN data channel now synthesizes `Connected` in case a `pcState`
+    event is lost — a status surface can never sit at "negotiating" over a
+    live link.
+  - Consent audit: the first pushed camera frame is logged
+    (`first camera frame pushed`) so the device log proves no pixels leave
+    before Enter.
 - **Warm connection launch pattern**: `WebRTCService` now negotiates the
   session eagerly (as soon as camera + signaling are ready — i.e. behind the
   warm-up screen) and `AutoStartSession`/`BeginStreaming()` gate only the
