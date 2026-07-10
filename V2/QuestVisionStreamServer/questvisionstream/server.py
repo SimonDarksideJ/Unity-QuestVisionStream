@@ -8,6 +8,7 @@ from dataclasses import replace
 from .config import ServerConfig, load_config
 from .detectors import DETECTOR_NAMES, get_detector
 from .health import start_health_server
+from .loop_noise import install_stun_retry_filter
 from .video_processor import VideoProcessor, configure_ffmpeg_logging
 from .webrtc_server import WebRTCServer
 
@@ -26,6 +27,10 @@ async def run() -> None:
     config = load_config()
     args = parse_args(config)
     config = replace(config, detector=args.detector, host=args.host, port=args.port)
+
+    # Drop aioice's benign post-teardown STUN-retry tracebacks (see loop_noise);
+    # they otherwise flood the console every time a peer connection closes.
+    install_stun_retry_filter(asyncio.get_running_loop())
 
     print(f"QuestVisionStream Server | detector={config.detector} | display={config.enable_display}")
 
