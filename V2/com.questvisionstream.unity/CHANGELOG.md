@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+- **Training flow** (`Runtime/Training/`, `Runtime/Services/Training/`): the
+  authoritative training state queue driven by detections.
+  - `TrainingScenario` / `TrainingScenarioParser` — the scenario queue's JSON
+    format (waiting class, form copy, options, detected class, world label,
+    image ref, result) plus the built-in Ethar demo scenario mirroring
+    `Training_Scenario.xlsx`.
+  - `TrainingStateMachine` — pure, EditMode-tested queue: the next expected
+    class is statically cached so the per-detection hot path is one string
+    comparison; non-matching detections are discarded.
+  - `TrainingStateService` (`ITrainingStateService`) — subscribes to the
+    detection service, advances the queue on the expected class, and routes
+    training form responses through the SAME detections path
+    (`TrainingResponseMessage` → `DetectionChannelParser` → batch handler),
+    so an action press is literally a detected class arriving.
+  - `ITrainingPresentationService` — the UX seam (step form, hand-menu step
+    readout, world label + connector); uGUI implementation lives in the
+    client app, same split as the render modules.
+- EditMode tests: scenario parsing/round-trip and the full demo flow
+  (`TrainingScenarioTests`, `TrainingStateMachineTests`).
+- Docs: `V2/Documentation/Training-Flow.md`.
+
 ## [1.0.0-pre.1] - 2026-07-06
 
 Initial V2 rebuild of the Unity client library as RealityCollective Service
