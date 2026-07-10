@@ -26,10 +26,9 @@ namespace QuestVisionStream.Client
     ///   - <b>Location indicator</b> — a pulsing marker at the detected box centre
     ///     with a leader-line connector up to a billboarded label pill.
     ///
-    /// Interaction: uGUI Buttons work with a pointer (Editor); in-headset the
-    /// right-controller A button presses the form's default (first) action —
-    /// same hardware-button contract as the warm-up screen, and only while a
-    /// form is showing, so it never fights the warm-up's Enter.
+    /// Interaction: uGUI Buttons pressed with the controller laser (trigger)
+    /// in-headset, or the mouse in the Editor — both through
+    /// <see cref="ControllerUiPointer"/>. No hardware-button shortcuts.
     /// </summary>
     [AddComponentMenu("")]
     public sealed class TrainingUxController : MonoBehaviour
@@ -76,9 +75,6 @@ namespace QuestVisionStream.Client
         private Material hintLineMaterial;
         private Coroutine hintPulse;
 
-        private InputAction selectAction;
-        private int optionCount;
-
         public bool IsFormVisible => formRoot != null && formRoot.activeSelf;
 
         public void Initialize(ThemePalette palette, float formDistance, Action<int> optionPressed, HandMenu.Actions menuActions)
@@ -91,11 +87,6 @@ namespace QuestVisionStream.Client
             ControllerUiPointer.EnsureSetup();
             BuildHandMenu(menuActions);
 
-            // A presses the form's default action — active only while a form shows.
-            selectAction = new InputAction("QVS Training Select", InputActionType.Button, "<XRController>{RightHand}/primaryButton");
-            selectAction.performed += _ => OnSelectPressed();
-            selectAction.Enable();
-
             leftPositionAction = new InputAction("QVS Training Menu Pos", InputActionType.Value, "<XRController>{LeftHand}/devicePosition");
             leftRotationAction = new InputAction("QVS Training Menu Rot", InputActionType.Value, "<XRController>{LeftHand}/deviceRotation");
             leftPositionAction.Enable();
@@ -104,7 +95,6 @@ namespace QuestVisionStream.Client
 
         private void OnDestroy()
         {
-            selectAction?.Dispose();
             leftPositionAction?.Dispose();
             leftRotationAction?.Dispose();
 
@@ -133,7 +123,6 @@ namespace QuestVisionStream.Client
             if (!step.HasPresentation)
             {
                 formRoot.SetActive(false);
-                optionCount = 0;
                 return;
             }
 
@@ -153,7 +142,6 @@ namespace QuestVisionStream.Client
 
         public void HideForm()
         {
-            optionCount = 0;
             if (formRoot != null)
             {
                 formRoot.SetActive(false);
@@ -236,9 +224,8 @@ namespace QuestVisionStream.Client
                 UIFactory.Stretch(caption.rectTransform, 8f);
             }
 
-            // Actions — default one; the first is the ( A ) hardware-button target.
-            optionCount = step.Options.Count;
-            if (optionCount > 0)
+            // Actions — default one; the first renders as the primary button.
+            if (step.Options.Count > 0)
             {
                 var row = f.Rect("Actions", panel);
                 f.HLayout(row, 10, TextAnchor.MiddleCenter, controlWidth: true, controlHeight: true, expandWidth: false);
@@ -246,15 +233,14 @@ namespace QuestVisionStream.Client
                 for (var i = 0; i < step.Options.Count; i++)
                 {
                     var captured = i;
-                    var label = i == 0 ? $"{step.Options[i]}  ( A )" : step.Options[i];
                     var button = i == 0
-                        ? f.PrimaryButton(row, label, () => onOptionPressed?.Invoke(captured), height: 52, fontSize: 16)
-                        : f.SecondaryButton(row, label, () => onOptionPressed?.Invoke(captured), height: 52, fontSize: 16);
+                        ? f.PrimaryButton(row, step.Options[i], () => onOptionPressed?.Invoke(captured), height: 52, fontSize: 16)
+                        : f.SecondaryButton(row, step.Options[i], () => onOptionPressed?.Invoke(captured), height: 52, fontSize: 16);
                     button.GetComponent<LayoutElement>().flexibleWidth = 1;
                 }
             }
 
-            f.Label(panel, "Pinch or press ( A ) to select · Turn palm up for menu", 11, T.textLo);
+            f.Label(panel, "Point and pull the trigger to select · Turn palm up for menu", 11, T.textLo);
         }
 
         // ------------------------------------------------------------ hand menu
@@ -504,14 +490,5 @@ namespace QuestVisionStream.Client
             panel.position = position;
             panel.rotation = Quaternion.LookRotation(position - camera.transform.position);
         }
-
-        private void OnSelectPressed()
-        {
-            if (IsFormVisible && optionCount > 0)
-            {
-                onOptionPressed?.Invoke(0);
-            }
-        }
-
     }
 }

@@ -3,4 +3,5 @@
   <Project Path="XRTraining.csproj" />
   <Project Path="QuestVisionStream.Unity.csproj" />
   <Project Path="QuestVisionStream.Unity.Tags.Keijiro.csproj" />
+  <Project Path="QuestVisionStream.Unity.Editor.csproj" />
 </Solution>

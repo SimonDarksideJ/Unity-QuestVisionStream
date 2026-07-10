@@ -8,7 +8,7 @@ namespace QuestVisionStream.Tests
 {
     public class TrainingScenarioParserTests
     {
-        // Mirrors Assets/XRTraining/Resources/EtharTrainingScenario.json (Training_Scenario.xlsx).
+        // Mirrors Assets/XRTraining/Resources/EtharTrainingScenario.asset (Training_Scenario.xlsx).
         private const string ScenarioJson = @"{
             ""name"": ""Ethar Training Demo"",
             ""steps"": [

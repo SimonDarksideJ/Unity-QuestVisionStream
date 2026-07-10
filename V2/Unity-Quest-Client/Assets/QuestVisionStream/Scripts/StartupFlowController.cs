@@ -4,7 +4,6 @@
 using QuestVisionStream.Protocol;
 using QuestVisionStream.Services;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace QuestVisionStream.Client
@@ -23,8 +22,8 @@ namespace QuestVisionStream.Client
     ///     connected", and the VPN/server failure hint.
     ///   - Card hides once the streaming session starts.
     ///
-    /// Activation is the controller laser (trigger) or the right-controller A
-    /// button (acts ONLY while the button is enabled — same contract as a
+    /// Activation is the controller laser: point at the button and pull the
+    /// trigger (acts ONLY while the button is enabled — same contract as a
     /// disabled DOM button). Status/diagnostics live in the detection HUD log
     /// window — this card renders no free-floating debug text.
     /// </summary>
@@ -50,9 +49,8 @@ namespace QuestVisionStream.Client
         private GameObject introRoot;
         private Text buttonText;
         private Image buttonImage;
+        private Button buttonControl;
         private Text noteText;
-
-        private InputAction enterAction;
 
         private bool buttonEnabled;
         private bool starting;
@@ -82,10 +80,6 @@ namespace QuestVisionStream.Client
 
             BuildIntroCard();
 
-            enterAction = new InputAction("QVS Enter", InputActionType.Button, "<XRController>{RightHand}/primaryButton");
-            enterAction.performed += _ => OnEnterPressed();
-            enterAction.Enable();
-
             Render();
         }
 
@@ -101,8 +95,6 @@ namespace QuestVisionStream.Client
             {
                 webrtc.StateChanged -= OnWebRTCStateChanged;
             }
-
-            enterAction?.Dispose();
         }
 
         private void Update()
@@ -248,9 +240,10 @@ namespace QuestVisionStream.Client
         private void SetButton(string label, bool enabled)
         {
             buttonEnabled = enabled;
-            buttonText.text = enabled ? $"{label}  ( A )" : label;
+            buttonText.text = label;
             buttonImage.color = enabled ? ButtonEnabledColor : ButtonDisabledColor;
             buttonText.color = enabled ? ButtonEnabledText : ButtonDisabledText;
+            buttonControl.interactable = enabled;
         }
 
         private void SetNote(string text, bool error)
@@ -270,8 +263,7 @@ namespace QuestVisionStream.Client
             var canvas = introRoot.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.worldCamera = Camera.main;
-            // Point-and-click on the Enter button with the controller laser; the
-            // (A) hardware shortcut stays as the fallback.
+            // Point-and-click on the Enter button with the controller laser.
             ControllerUiPointer.EnsureSetup();
             ControllerUiPointer.RegisterCanvas(introRoot);
             var canvasRect = (RectTransform)introRoot.transform;
@@ -290,9 +282,20 @@ namespace QuestVisionStream.Client
             var buttonObject = CreatePanel(card, "EnterButton", ButtonDisabledColor);
             Place((RectTransform)buttonObject.transform, new Vector2(0.5f, 1f), new Vector2(0, -265), new Vector2(300, 70));
             buttonImage = buttonObject.GetComponent<Image>();
-            var button = buttonObject.gameObject.AddComponent<Button>();
-            button.targetGraphic = buttonImage;
-            button.onClick.AddListener(OnEnterPressed);
+            buttonControl = buttonObject.gameObject.AddComponent<Button>();
+            buttonControl.targetGraphic = buttonImage;
+            buttonControl.onClick.AddListener(OnEnterPressed);
+
+            // SetButton drives the colours by hand, so neutralise the ColorTint
+            // transition (keep only a slight press dim) — interactable then gates
+            // the hover glow and clicks without repainting the button.
+            var tint = buttonControl.colors;
+            tint.normalColor = tint.highlightedColor = tint.selectedColor = tint.disabledColor = Color.white;
+            tint.pressedColor = new Color(0.85f, 0.85f, 0.85f);
+            tint.colorMultiplier = 1f;
+            buttonControl.colors = tint;
+
+            XRTraining.Components.ButtonHoverGlow.Attach(buttonObject.gameObject, ButtonEnabledColor, radius: 10);
 
             var label = CreateText((RectTransform)buttonObject.transform, "Label", "Checking camera…", 24, FontStyle.Bold, ButtonDisabledText);
             Stretch(label, Vector2.zero, Vector2.zero);

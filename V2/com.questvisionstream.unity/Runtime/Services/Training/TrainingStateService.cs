@@ -16,8 +16,8 @@ namespace QuestVisionStream.Services
     public class TrainingStateServiceProfile : BaseProfile
     {
         [SerializeField]
-        [Tooltip("Scenario queue in JSON format (see Documentation/Training-Flow.md). Empty falls back to the built-in Ethar demo scenario.")]
-        private TextAsset scenarioJson;
+        [Tooltip("The scenario asset to run (Create → QuestVisionStream → Training Scenario). Empty falls back to the built-in Ethar demo scenario.")]
+        private TrainingScenarioAsset scenario;
 
         [SerializeField, Range(0f, 1f)]
         [Tooltip("Detections below this confidence never advance the flow (synthetic action responses are always 1.0).")]
@@ -27,7 +27,7 @@ namespace QuestVisionStream.Services
         [Tooltip("Log every transition and discard summary, prefixed [QVS:Training] for logcat filtering.")]
         private bool verboseLogging = true;
 
-        public TextAsset ScenarioJson { get => scenarioJson; set => scenarioJson = value; }
+        public TrainingScenarioAsset Scenario { get => scenario; set => scenario = value; }
         public float MinimumDetectionConfidence { get => minimumDetectionConfidence; set => minimumDetectionConfidence = value; }
         public bool VerboseLogging { get => verboseLogging; set => verboseLogging = value; }
     }
@@ -246,14 +246,15 @@ namespace QuestVisionStream.Services
 
         private void LoadConfiguredScenario()
         {
-            if (profile.ScenarioJson != null && LoadScenarioJson(profile.ScenarioJson.text))
+            if (profile.Scenario != null)
             {
-                return;
-            }
+                if (profile.Scenario.Steps.Count > 0)
+                {
+                    LoadScenario(profile.Scenario.ToScenario());
+                    return;
+                }
 
-            if (profile.ScenarioJson != null)
-            {
-                Debug.LogWarning($"[QVS:Training] '{profile.ScenarioJson.name}' rejected — falling back to the built-in demo scenario");
+                Debug.LogWarning($"[QVS:Training] '{profile.Scenario.name}' has no steps — falling back to the built-in demo scenario");
             }
 
             LoadScenario(TrainingScenarioLibrary.EtharDemo());

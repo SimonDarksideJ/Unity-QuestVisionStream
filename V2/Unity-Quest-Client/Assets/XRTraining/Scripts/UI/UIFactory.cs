@@ -223,6 +223,9 @@ namespace XRTraining.UI
             btn.colors = cb;
             btn.interactable = s.interactable;
             if (s.onClick != null) btn.onClick.AddListener(() => s.onClick());
+
+            // Pointer-hover feedback: slight expand + accent glow past the edge.
+            Components.ButtonHoverGlow.Attach(root.gameObject, T.accent, s.radius + 4);
             return btn;
         }
 

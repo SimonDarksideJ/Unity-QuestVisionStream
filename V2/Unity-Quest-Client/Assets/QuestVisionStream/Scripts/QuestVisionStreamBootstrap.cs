@@ -3,6 +3,7 @@
 
 using QuestVisionStream.Core;
 using QuestVisionStream.Services;
+using QuestVisionStream.Training;
 using RealityCollective.ServiceFramework;
 using RealityCollective.ServiceFramework.Services;
 using Unity.XR.CoreUtils;
@@ -83,8 +84,8 @@ namespace QuestVisionStream.Client
         private bool enableTraining = true;
 
         [SerializeField]
-        [Tooltip("Scenario queue JSON (see Documentation/Training-Flow.md). Empty loads Resources/EtharTrainingScenario, falling back to the built-in demo.")]
-        private TextAsset trainingScenarioJson;
+        [Tooltip("Scenario asset (Create → QuestVisionStream → Training Scenario). Empty loads Resources/EtharTrainingScenario, falling back to the built-in demo.")]
+        private TrainingScenarioAsset trainingScenario;
 
         [SerializeField]
         [Tooltip("Built-in XRTraining palette for the training UX: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
@@ -173,7 +174,7 @@ namespace QuestVisionStream.Client
                         status, webrtcService, signalingService);
                 }
 
-                // Warm-up flow: confirm the connection, then Enter/(A) starts frames.
+                // Warm-up flow: confirm the connection, then Enter (laser click) starts frames.
                 if (webrtcService != null &&
                     signalingService != null &&
                     serviceManager.TryGetService<ICameraStreamService>(out var cameraService))
@@ -457,9 +458,9 @@ namespace QuestVisionStream.Client
             if (enableTraining)
             {
                 var trainingStateProfile = ScriptableObject.CreateInstance<TrainingStateServiceProfile>();
-                trainingStateProfile.ScenarioJson = trainingScenarioJson != null
-                    ? trainingScenarioJson
-                    : Resources.Load<TextAsset>("EtharTrainingScenario");
+                trainingStateProfile.Scenario = trainingScenario != null
+                    ? trainingScenario
+                    : Resources.Load<TrainingScenarioAsset>("EtharTrainingScenario");
                 serviceManager.TryCreateAndRegisterService<ITrainingStateService>(
                     typeof(TrainingStateService), out _, "Training State", 45u, trainingStateProfile);
 

@@ -32,7 +32,11 @@ detections data channel  │            DetectionService                │
 
 ## The state queue
 
-A scenario is an ordered queue of steps (JSON, or authored in code). Each step:
+A scenario is an ordered queue of steps, authored as a **`TrainingScenarioAsset`
+ScriptableObject** (Create → QuestVisionStream → Training Scenario) and edited
+in its custom inspector; JSON (`TrainingScenarioParser`) remains the wire
+format for pushing scenarios at runtime, and the inspector imports/exports it.
+Each step:
 
 | Field | Meaning |
 |-------|---------|
@@ -62,8 +66,8 @@ class.
 
 ## The demo scenario (Training_Scenario.xlsx)
 
-Shipped as `Assets/XRTraining/Resources/EtharTrainingScenario.json` (and as the
-built-in fallback `TrainingScenarioLibrary.EtharDemo()`):
+Shipped as `Assets/XRTraining/Resources/EtharTrainingScenario.asset` (and as
+the built-in fallback `TrainingScenarioLibrary.EtharDemo()`):
 
 | # | Waits for | Form | Action → result | World label |
 |---|-----------|------|-----------------|-------------|
@@ -94,8 +98,8 @@ wants to move on. If a step must be detection-only, give it no options.)
   the world label tracks the object), `ScenarioCompleted`.
 - `CompleteStep(TrainingStepResult)` — the custom response class fed back by
   the presentation layer; routes the result class down the detections path.
-- Profile: scenario `TextAsset`, minimum detection confidence (default 0.5),
-  verbose logging (`[QVS:Training]` for logcat filtering).
+- Profile: the `TrainingScenarioAsset` to run, minimum detection confidence
+  (default 0.5), verbose logging (`[QVS:Training]` for logcat filtering).
 
 ### `ITrainingPresentationService` (interface in package, implementation in the client app)
 
@@ -132,8 +136,11 @@ Receives UX requests from the state flow and owns the training UI
   what they're aiming at (no interaction-toolkit dependency; the Editor mouse
   works through the same module). Every interactive world-space canvas — the
   warm-up Enter card, the step form, the hand menu — registers a
-  `TrackedDeviceRaycaster` through `ControllerUiPointer.RegisterCanvas`. The
-  right-controller **A** remains a shortcut for the form's first action.
+  `TrackedDeviceRaycaster` through `ControllerUiPointer.RegisterCanvas`.
+  Selection is pointer-only: there are no hardware-button shortcuts. The beam
+  is clamped to the UI raycast hit (it stops on what a click would land on)
+  with a circular reticle laid flat on the surface, and every button carries
+  `ButtonHoverGlow` — a slight expand plus accent glow while the ray is on it.
 
 ## Launch pattern
 
@@ -148,7 +155,7 @@ instant:
    (signaling) → `Negotiating…` (session warming) → **`Enter`**, which only
    lights up when the peer connection reports Connected. By the time the user
    can press it, the pipeline is READY.
-3. **Enter** (laser click or A) — the frame pump starts (first pixels leave
+3. **Enter** (laser click) — the frame pump starts (first pixels leave
    the device now), the card hides, and the training scenario auto-begins:
    the Welcome form appears immediately. Auto-begin requires both gates —
    user entered **and** session connected — with the server `ready` handshake
@@ -158,23 +165,25 @@ instant:
 
 Both services are registered code-first in `QuestVisionStreamBootstrap`
 (priorities 45/46) behind the `enableTraining` toggle, alongside a
-`trainingScenarioJson` override and a theme index (Dark·Cyan / Light·Teal /
+`trainingScenario` asset override and a theme index (Dark·Cyan / Light·Teal /
 Hi-Vis·Orange — the swappable XRTraining palettes).
 
 ## Authoring a new scenario
 
-1. Copy `EtharTrainingScenario.json` and edit the queue — keep the chain rule:
-   *each step's `result` is the next step's `waitingClass`*, and the final
-   step's `result` empty.
+1. **Create → QuestVisionStream → Training Scenario** and edit the queue in the
+   inspector — keep the chain rule: *each step's `result` is a later step's
+   `waitingClass`*, and the final step's `result` empty. The inspector
+   validates the chain live (unreachable steps, dead-end results, early
+   completion) and shows the expected-class queue.
 2. Use detector class names (`tv`, `person`, …) for steps advanced by vision;
    use any unique token (`begintraining`, `foundtv`, …) for steps advanced by
    an action press.
-3. Assign the asset to **Bootstrap ▸ Training Scenario Json** (or replace the
-   Resources asset).
+3. Assign the asset to **Bootstrap ▸ Training Scenario** (or replace
+   `Assets/XRTraining/Resources/EtharTrainingScenario.asset`).
 
-Malformed JSON is rejected at load (the current scenario is kept and the
-built-in demo is the last-resort fallback), and
-`TrainingScenarioParser.ToJson` round-trips a scenario for tooling.
+The inspector's **Import JSON… / Export JSON…** buttons round-trip the wire
+format (`TrainingScenarioParser`); an asset with no steps is rejected at load
+and the built-in demo is the last-resort fallback.
 
 ## Tests
 

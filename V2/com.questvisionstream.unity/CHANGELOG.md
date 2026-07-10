@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- **Training scenarios are now ScriptableObject assets**:
+  `TrainingScenarioAsset` (Create → QuestVisionStream → Training Scenario) with
+  a custom inspector in the new `QuestVisionStream.Unity.Editor` assembly —
+  live chain validation (unreachable steps, dead-end results, early completion)
+  and JSON import/export via `TrainingScenarioParser`, which stays as the wire
+  format. `TrainingStateServiceProfile` takes the asset instead of a JSON
+  `TextAsset`; an asset with no steps falls back to the built-in demo.
+- **Breaking**: `TrainingStateServiceProfile.ScenarioJson` (TextAsset) replaced
+  by `TrainingStateServiceProfile.Scenario` (`TrainingScenarioAsset`).
+  `ITrainingStateService.LoadScenarioJson` is unchanged.
+
 - **Fix: eager negotiation no longer self-destructs (stuck "Negotiating…")**.
   Three related repairs in `WebRTCService`/the Android transport:
   - The "signaling restored" renegotiation now fires only after a REAL
