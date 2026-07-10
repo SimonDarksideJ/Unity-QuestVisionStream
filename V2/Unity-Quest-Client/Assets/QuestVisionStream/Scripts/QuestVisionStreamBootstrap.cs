@@ -151,6 +151,12 @@ namespace QuestVisionStream.Client
                 serviceManager.TryGetService<IWebRTCService>(out var webrtcService);
                 serviceManager.TryGetService<ISignalingService>(out var signalingService);
 
+                // At-a-glance connection dot (green/red, top right). Text-free — all
+                // logging/messaging lives in the log window below.
+                var connectionDot = new GameObject("QVS_ConnectionDot");
+                connectionDot.transform.SetParent(camera.transform, false);
+                connectionDot.AddComponent<ConnectionDotController>().Initialize(status);
+
                 // THE log window: the left-third translucent panel with the live
                 // detection feed plus the status/diagnostics section. All logging/
                 // messaging lands here — no free-floating 3D text; the only other
