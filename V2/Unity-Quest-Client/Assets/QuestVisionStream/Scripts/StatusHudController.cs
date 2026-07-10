@@ -18,8 +18,7 @@ namespace QuestVisionStream.Client
     {
         private IStatusService status;
         private TextMesh headline;
-        private MeshRenderer dotRenderer;
-        private MaterialPropertyBlock dotBlock;
+        private Material dotMaterial;
         private string lastHeadline = string.Empty;
 
         public void Initialize(IStatusService statusService)
@@ -45,11 +44,11 @@ namespace QuestVisionStream.Client
             dot.transform.SetParent(transform, false);
             dot.transform.localPosition = new Vector3(0.28f, 0.20f, 1.2f);
             dot.transform.localScale = Vector3.one * 0.012f;
-            dotRenderer = dot.GetComponent<MeshRenderer>();
-            dotRenderer.sharedMaterial = new Material(Shader.Find("Sprites/Default"));
+            var dotRenderer = dot.GetComponent<MeshRenderer>();
+            dotMaterial = UnlitMaterialFactory.Create(); // URP + XR safe
+            dotRenderer.sharedMaterial = dotMaterial;
             dotRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             dotRenderer.receiveShadows = false;
-            dotBlock = new MaterialPropertyBlock();
         }
 
         private void Update()
@@ -70,8 +69,7 @@ namespace QuestVisionStream.Client
             var connection = status.Model.Get(StatusModel.Fields.Connection);
             var connected = connection.HasValue &&
                             connection.Value.Severity == StatusSeverity.Ok;
-            dotBlock.SetColor("_Color", connected ? new Color(0.2f, 0.85f, 0.35f) : new Color(0.9f, 0.25f, 0.2f));
-            dotRenderer.SetPropertyBlock(dotBlock);
+            UnlitMaterialFactory.SetColor(dotMaterial, connected ? new Color(0.2f, 0.85f, 0.35f) : new Color(0.9f, 0.25f, 0.2f));
         }
     }
 }

@@ -43,6 +43,7 @@ namespace QuestVisionStream.Client
         private CameraStreamState state = CameraStreamState.Idle;
         private bool permissionsRequested;
         private bool configurationChosen;
+        private bool intrinsicsLogged;
         private float permissionDeniedAtRealtime = -1f;
 
         public MetaPassthroughCameraCaptureModule(
@@ -63,6 +64,46 @@ namespace QuestVisionStream.Client
             : Vector2Int.zero;
 
         public string LastError { get; private set; }
+
+        /// <inheritdoc />
+        public bool TryGetProjectionMatrix(out Matrix4x4 projection)
+        {
+            projection = Matrix4x4.identity;
+
+            // Only once frames are flowing — the Meta subsystem warns if intrinsics
+            // are queried before the camera is ready.
+            if (state != CameraStreamState.Active || cameraManager == null ||
+                !cameraManager.TryGetIntrinsics(out var intrinsics))
+            {
+                return false;
+            }
+
+            var resolution = intrinsics.resolution;
+            var focal = intrinsics.focalLength;
+            if (resolution.x <= 0 || resolution.y <= 0 || focal.x <= 0f || focal.y <= 0f)
+            {
+                return false;
+            }
+
+            // Symmetric perspective matching the passthrough camera's field of view.
+            // The principal-point offset is ignored: it sits near centre on Quest and
+            // the dominant placement error is the FOV gap between the camera and the
+            // display eye. near/far do not affect the unprojected ray direction.
+            const float near = 0.1f;
+            const float far = 1000f;
+            var verticalFovDegrees = 2f * Mathf.Atan2(resolution.y * 0.5f, focal.y) * Mathf.Rad2Deg;
+            var aspect = (resolution.x / focal.x) / (resolution.y / focal.y);
+            projection = Matrix4x4.Perspective(verticalFovDegrees, aspect, near, far);
+
+            if (!intrinsicsLogged)
+            {
+                intrinsicsLogged = true;
+                var horizontalFovDegrees = 2f * Mathf.Atan2(resolution.x * 0.5f, focal.x) * Mathf.Rad2Deg;
+                Debug.Log($"[QVS:MetaCamera] Intrinsics res={resolution.x}x{resolution.y} focal=({focal.x:0},{focal.y:0}) principal=({intrinsics.principalPoint.x:0},{intrinsics.principalPoint.y:0}) -> FOV h={horizontalFovDegrees:0.0}° v={verticalFovDegrees:0.0}° aspect={aspect:0.000}");
+            }
+
+            return true;
+        }
 
         /// <inheritdoc />
         public override void Start()

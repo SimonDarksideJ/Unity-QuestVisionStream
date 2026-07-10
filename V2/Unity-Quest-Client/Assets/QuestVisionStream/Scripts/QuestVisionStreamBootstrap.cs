@@ -1,6 +1,7 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
+using QuestVisionStream.Core;
 using QuestVisionStream.Services;
 using RealityCollective.ServiceFramework;
 using RealityCollective.ServiceFramework.Services;
@@ -64,6 +65,10 @@ namespace QuestVisionStream.Client
         [Tooltip("Fixed placement distance for ephemeral boxes (and anchored fallback).")]
         private float placementDistanceMeters = 2f;
 
+        [SerializeField]
+        [Tooltip("Simple-mode alignment aid — pitches detection rays down to offset the passthrough camera mount (positive = boxes down). 11° is the on-device tuned value for arm's-length desk objects; hold Y + L-stick to re-tune live, or 0 to disable. A fixed-depth approximation; the depth/anchored mode is the accurate fix.")]
+        private float cameraPitchCompensationDegrees = 11f;
+
         [Header("Quality")]
         [SerializeField]
         private bool enableQualifier = true;
@@ -80,7 +85,17 @@ namespace QuestVisionStream.Client
         [Tooltip("Physical printed tag width in meters (tagStandard41h12 sheets from V2/tools/generate-apriltags.py).")]
         private float tagSizeMeters = 0.1f;
 
+        private const float PitchTuneRateDegreesPerSecond = 20f;
+
         private ServiceManager serviceManager;
+        private InputAction switchRenderAction;
+        private InputAction tagBehaviourAction;
+        private InputAction tunePitchHoldAction;
+        private InputAction tunePitchAxisAction;
+        private IPoseTrackingService poseTracking;
+        private RoomScanController roomScan;
+        private EnvironmentDepthProvider environmentDepth;
+        private bool pitchTuning;
 
         private void Awake()
         {
@@ -124,6 +139,19 @@ namespace QuestVisionStream.Client
                 hud.transform.SetParent(camera.transform, false);
                 hud.AddComponent<StatusHudController>().Initialize(status);
 
+                // Live detection feed HUD — left-third translucent panel that lists
+                // the classes and approximate on-screen locations of everything the
+                // client received this frame (a test read-out of the arrival path).
+                if (serviceManager.TryGetService<IDetectionService>(out var detectionService))
+                {
+                    serviceManager.TryGetService<IDetectionRendererService>(out var rendererService);
+                    serviceManager.TryGetService<IPoseTrackingService>(out poseTracking);
+                    serviceManager.TryGetService<IAnchoredTagRenderModule>(out var anchoredModule);
+                    var detectionHud = new GameObject("QVS_DetectionHud");
+                    detectionHud.transform.SetParent(camera.transform, false);
+                    detectionHud.AddComponent<DetectionHudController>().Initialize(detectionService, rendererService, poseTracking, anchoredModule);
+                }
+
                 // Warm-up flow: confirm the connection, then (A) starts streaming,
                 // (B) toggles the live debug panel.
                 if (serviceManager.TryGetService<IWebRTCService>(out var webrtcService) &&
@@ -135,6 +163,48 @@ namespace QuestVisionStream.Client
                     warmup.AddComponent<StartupFlowController>()
                         .Initialize(status, webrtcService, signalingService, cameraService);
                 }
+            }
+
+            // X (left controller) toggles between the two detection render modules
+            // at runtime — outline boxes <-> anchored tags — for A/B testing on device.
+            switchRenderAction = new InputAction("QVS Switch Render", InputActionType.Button, "<XRController>{LeftHand}/primaryButton");
+            switchRenderAction.performed += _ => ToggleRenderMode();
+            switchRenderAction.Enable();
+
+            // B (right controller) toggles anchored-tag behaviour: persistent world
+            // pins (default) <-> update-in-place tracking. Only affects anchored mode.
+            tagBehaviourAction = new InputAction("QVS Tag Behaviour", InputActionType.Button, "<XRController>{RightHand}/secondaryButton");
+            tagBehaviourAction.performed += _ => ToggleTagBehaviour();
+            tagBehaviourAction.Enable();
+
+            // Hold Y (left controller) + push the left thumbstick up/down to tune the
+            // ephemeral pitch compensation live in-headset (no rebuild). The final
+            // value is logged on release so it can be baked into the inspector default.
+            serviceManager.TryGetService<IPoseTrackingService>(out poseTracking);
+            tunePitchHoldAction = new InputAction("QVS Tune Pitch Hold", InputActionType.Button, "<XRController>{LeftHand}/secondaryButton");
+            tunePitchAxisAction = new InputAction("QVS Tune Pitch Axis", InputActionType.Value, expectedControlType: "Vector2");
+            // Both control names appear across XR/OpenXR layouts — bind both so the stick resolves.
+            tunePitchAxisAction.AddBinding("<XRController>{LeftHand}/thumbstick");
+            tunePitchAxisAction.AddBinding("<XRController>{LeftHand}/primary2DAxis");
+            tunePitchHoldAction.Enable();
+            tunePitchAxisAction.Enable();
+
+            // Raw per-frame environment depth (Meta Depth API) — the PRIMARY depth
+            // source for anchored tags, so objects land at their true distance with no
+            // room scan. Falls back to the scanned scene mesh, then a fixed distance.
+            var depthObject = new GameObject("QVS_EnvironmentDepth");
+            environmentDepth = depthObject.AddComponent<EnvironmentDepthProvider>();
+            environmentDepth.Initialize(camera);
+
+            // Advanced/depth mode: ensures a room scan exists so the anchored tags have
+            // a scene-mesh FALLBACK when environment depth is unavailable at a pixel.
+            // Created disabled; only the anchored mode drives a scan.
+            var scanObject = new GameObject("QVS_RoomScan");
+            roomScan = scanObject.AddComponent<RoomScanController>();
+            roomScan.Initialize(FindFirstObjectByType<XROrigin>());
+            if (renderMode == DetectionRenderMode.AnchoredTags)
+            {
+                roomScan.EnsureSceneReady();
             }
 
             // The demo rule from the WebXR client: prove the "see X → do Y" seam.
@@ -158,6 +228,76 @@ namespace QuestVisionStream.Client
             {
                 renderer.SetActiveModule(mode == DetectionRenderMode.AnchoredTags ? AnchoredModuleName : EphemeralModuleName);
             }
+
+            // Entering the depth-anchored mode: make sure the room is scanned.
+            if (mode == DetectionRenderMode.AnchoredTags)
+            {
+                roomScan?.EnsureSceneReady();
+            }
+        }
+
+        /// <summary>Flip between the two render modules — bound to the X button.</summary>
+        public void ToggleRenderMode()
+        {
+            var next = renderMode == DetectionRenderMode.EphemeralBoxes
+                ? DetectionRenderMode.AnchoredTags
+                : DetectionRenderMode.EphemeralBoxes;
+            SetRenderMode(next);
+            Debug.Log($"[QVS] Detection render mode -> {next} (X)");
+        }
+
+        /// <summary>
+        /// Flip anchored tags between persistent world-pins and update-in-place
+        /// tracking — bound to the B button. Only affects the anchored render module.
+        /// </summary>
+        public void ToggleTagBehaviour()
+        {
+            if (serviceManager != null &&
+                serviceManager.TryGetService<IAnchoredTagRenderModule>(out var anchored))
+            {
+                anchored.PersistentTags = !anchored.PersistentTags;
+                anchored.Clear(); // drop existing placements so the new behaviour is visible immediately
+                Debug.Log($"[QVS] Anchored tag behaviour -> {(anchored.PersistentTags ? "Persistent (world-pinned)" : "Update-in-place (tracking)")} (B)");
+            }
+        }
+
+        private void Update()
+        {
+            // Live pitch tuning: hold Y, move the left thumbstick up/down.
+            var holding = tunePitchHoldAction != null && tunePitchHoldAction.IsPressed();
+            if (holding)
+            {
+                if (poseTracking == null)
+                {
+                    serviceManager.TryGetService<IPoseTrackingService>(out poseTracking);
+                }
+
+                var stick = tunePitchAxisAction.ReadValue<Vector2>();
+                if (poseTracking != null && Mathf.Abs(stick.y) >= 0.15f)
+                {
+                    // Stick up = boxes up (less down-pitch); positive pitch = boxes down.
+                    var next = poseTracking.CameraPitchCompensationDegrees - stick.y * PitchTuneRateDegreesPerSecond * Time.deltaTime;
+                    poseTracking.CameraPitchCompensationDegrees = Mathf.Clamp(next, -45f, 45f);
+                }
+
+                pitchTuning = true;
+            }
+            else if (pitchTuning)
+            {
+                pitchTuning = false;
+                if (poseTracking != null)
+                {
+                    Debug.Log($"[QVS] Camera pitch compensation set to {poseTracking.CameraPitchCompensationDegrees:0.0}° — bake this into the bootstrap's 'Camera Pitch Compensation Degrees'.");
+                }
+            }
+        }
+
+        private void OnDestroy()
+        {
+            switchRenderAction?.Dispose();
+            tagBehaviourAction?.Dispose();
+            tunePitchHoldAction?.Dispose();
+            tunePitchAxisAction?.Dispose();
         }
 
         /// <summary>
@@ -262,6 +402,7 @@ namespace QuestVisionStream.Client
 
             // --- Pose tracking (25) ---
             var poseProfile = ScriptableObject.CreateInstance<PoseTrackingServiceProfile>();
+            poseProfile.CameraPitchCompensationDegrees = cameraPitchCompensationDegrees;
             serviceManager.TryCreateAndRegisterService<IPoseTrackingService>(
                 typeof(PoseTrackingService), out _, "Pose Tracking", 25u, poseProfile);
 

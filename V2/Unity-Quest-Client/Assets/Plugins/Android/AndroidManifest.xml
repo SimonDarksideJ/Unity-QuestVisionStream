@@ -22,5 +22,8 @@
   <!-- Passthrough camera access (both are required; also requested at runtime). -->
   <uses-permission android:name="android.permission.CAMERA" />
   <uses-permission android:name="horizonos.permission.HEADSET_CAMERA" />
+  <!-- Scene understanding (planes / mesh / anchors) + environment depth for the
+       depth-anchored render mode. Also requested at runtime before the room scan. -->
+  <uses-permission android:name="com.oculus.permission.USE_SCENE" />
   <horizonos:uses-horizonos-sdk horizonos:minSdkVersion="74" horizonos:targetSdkVersion="203" />
 </manifest>

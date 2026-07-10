@@ -289,7 +289,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2a13300a9e14cacbb01ed5d6ae84e69, type: 3}
   m_Name: ARMeshFeature Android
   m_EditorClassIdentifier: Unity.XR.MetaOpenXR::UnityEngine.XR.OpenXR.Features.Meta.ARMeshFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Meshing'
   version: 0.1.0
   featureIdInternal: com.unity.openxr.feature.arfoundation-meta-mesh
@@ -1392,7 +1392,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d00bb9c182ae8406ca03773119fa07ea, type: 3}
   m_Name: ARPlaneFeature Android
   m_EditorClassIdentifier: Unity.XR.MetaOpenXR::UnityEngine.XR.OpenXR.Features.Meta.ARPlaneFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Planes'
   version: 0.1.0
   featureIdInternal: com.unity.openxr.feature.arfoundation-meta-plane
@@ -1461,7 +1461,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b9b8cd1fcf8499eb57f194da9698fcd, type: 3}
   m_Name: AROcclusionFeature Android
   m_EditorClassIdentifier: Unity.XR.MetaOpenXR::UnityEngine.XR.OpenXR.Features.Meta.AROcclusionFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Occlusion'
   version: 0.1.0
   featureIdInternal: com.unity.openxr.feature.arfoundation-meta-occlusion
@@ -1813,7 +1813,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 85fd4a84074c74cb183c18e803dabb9e, type: 3}
   m_Name: ARAnchorFeature Android
   m_EditorClassIdentifier: Unity.XR.MetaOpenXR::UnityEngine.XR.OpenXR.Features.Meta.ARAnchorFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Anchors'
   version: 0.1.0
   featureIdInternal: com.unity.openxr.feature.arfoundation-meta-anchor
@@ -1950,7 +1950,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6096094d69d82cc40947df806f66ab34, type: 3}
   m_Name: OpenXRCompositionLayersFeature Android
   m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.Features.CompositionLayers.OpenXRCompositionLayersFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Composition Layers Support
   version: 1.0.0
   featureIdInternal: com.unity.openxr.feature.compositionlayers
@@ -2164,7 +2164,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dc65ec7c51504536bd51a47e3cb8fb6a, type: 3}
   m_Name: ARBoundingBoxFeature Android
   m_EditorClassIdentifier: Unity.XR.MetaOpenXR::UnityEngine.XR.OpenXR.Features.Meta.ARBoundingBoxFeature
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Bounding Boxes'
   version: 0.1.0
   featureIdInternal: com.unity.openxr.feature.arfoundation-meta-bounding-boxes

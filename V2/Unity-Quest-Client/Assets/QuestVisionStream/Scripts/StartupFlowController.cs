@@ -3,6 +3,7 @@
 
 using System.Text;
 using QuestVisionStream.Core;
+using QuestVisionStream.Protocol;
 using QuestVisionStream.Services;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -88,7 +89,11 @@ namespace QuestVisionStream.Client
             BuildDebugPanel();
 
             enterAction = new InputAction("QVS Enter", InputActionType.Button, "<XRController>{RightHand}/primaryButton");
-            debugAction = new InputAction("QVS Debug", InputActionType.Button, "<XRController>{RightHand}/secondaryButton");
+            // B (right secondary) is now the anchored-tag behaviour toggle (bootstrap),
+            // so the warm-up debug panel moves to the right thumbstick click.
+            debugAction = new InputAction("QVS Debug", InputActionType.Button);
+            debugAction.AddBinding("<XRController>{RightHand}/thumbstickClicked");
+            debugAction.AddBinding("<XRController>{RightHand}/primary2DAxisClick");
             enterAction.performed += _ => OnEnterPressed();
             debugAction.performed += _ => debugVisible = !debugVisible;
             enterAction.Enable();
@@ -290,7 +295,7 @@ namespace QuestVisionStream.Client
             Place(note, new Vector2(0.5f, 1f), new Vector2(0, -335), new Vector2(560, 60));
             noteText = note.GetComponent<Text>();
 
-            var hint = CreateText(card, "Hint", "( B )  debug status", 14, FontStyle.Normal, SubColor);
+            var hint = CreateText(card, "Hint", "( stick-click )  debug status", 14, FontStyle.Normal, SubColor);
             Place(hint, new Vector2(0.5f, 0f), new Vector2(0, 18), new Vector2(560, 24));
         }
 

@@ -41,6 +41,15 @@ namespace QuestVisionStream.Services
 
         /// <summary>Terminal error detail while <see cref="State"/> is Error.</summary>
         string LastError { get; }
+
+        /// <summary>
+        /// Try to build a projection matrix from the camera's real intrinsics (focal
+        /// length / principal point). Detections are unprojected through THIS — the
+        /// capture camera's field of view — so boxes align with the passthrough image
+        /// instead of being over-scaled by the much wider display-eye FOV. Returns
+        /// false when intrinsics are not yet available.
+        /// </summary>
+        bool TryGetProjectionMatrix(out Matrix4x4 projection);
     }
 
     /// <summary>
@@ -68,5 +77,11 @@ namespace QuestVisionStream.Services
 
         /// <summary>Terminal error detail when <see cref="State"/> is Error.</summary>
         string LastError { get; }
+
+        /// <summary>
+        /// The active capture module's intrinsics-based projection (see
+        /// <see cref="ICameraCaptureModule.TryGetProjectionMatrix"/>). False when unavailable.
+        /// </summary>
+        bool TryGetCameraProjection(out Matrix4x4 projection);
     }
 }

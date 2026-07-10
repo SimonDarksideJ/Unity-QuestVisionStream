@@ -70,7 +70,12 @@ namespace QuestVisionStream.Core
         public int Count => snapshots.Count;
 
         public void Record(double timeMs, Camera camera)
-            => Record(timeMs, camera.transform.localToWorldMatrix, camera.projectionMatrix.inverse);
+            // cameraToWorldMatrix, NOT transform.localToWorldMatrix: the projection
+            // matrix lives in Unity view space (looks down -Z), while the transform's
+            // forward is +Z. cameraToWorldMatrix carries that Z-flip, so unprojected
+            // rays point where the camera actually looks. localToWorldMatrix sent
+            // every ray BACKWARD, placing detections behind the viewer (invisible).
+            => Record(timeMs, camera.cameraToWorldMatrix, camera.projectionMatrix.inverse);
 
         public void Record(double timeMs, Matrix4x4 cameraToWorld, Matrix4x4 projectionInverse)
         {

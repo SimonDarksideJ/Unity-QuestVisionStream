@@ -29,5 +29,11 @@ namespace QuestVisionStream.Services
 
         /// <summary>Drop all history — required after a tracking-space recenter.</summary>
         void ClearHistory();
+
+        /// <summary>
+        /// Simple-mode vertical alignment aid, in degrees (positive pitches detection
+        /// rays down / boxes down). Settable at runtime for live in-headset tuning.
+        /// </summary>
+        float CameraPitchCompensationDegrees { get; set; }
     }
 }

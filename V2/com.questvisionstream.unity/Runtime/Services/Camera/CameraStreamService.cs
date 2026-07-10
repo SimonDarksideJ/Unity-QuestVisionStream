@@ -67,6 +67,19 @@ namespace QuestVisionStream.Services
 
         public string LastError => ActiveModule?.LastError;
 
+        /// <inheritdoc />
+        public bool TryGetCameraProjection(out Matrix4x4 projection)
+        {
+            var module = ActiveModule;
+            if (module != null)
+            {
+                return module.TryGetProjectionMatrix(out projection);
+            }
+
+            projection = Matrix4x4.identity;
+            return false;
+        }
+
         public Vector2Int StreamResolution
         {
             get

@@ -1,5 +1,5 @@
 ﻿<Solution>
-  <Project Path="QuestVisionStream.Unity.csproj" />
   <Project Path="QuestVisionStream.Client.csproj" />
+  <Project Path="QuestVisionStream.Unity.csproj" />
   <Project Path="QuestVisionStream.Unity.Tags.Keijiro.csproj" />
 </Solution>
