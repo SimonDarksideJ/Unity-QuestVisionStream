@@ -45,6 +45,7 @@ namespace QuestVisionStream.Services
         }
 
         public event Action<WebRTCConnectionState> StateChanged;
+        public event Action StreamingBegan;
         public event Action<string> DiagnosticChanged;
         public event Action<string> DetectionMessageReceived;
 
@@ -112,7 +113,8 @@ namespace QuestVisionStream.Services
             }
 
             StreamingRequested = true;
-            ReportDiagnostic("streaming requested");
+            ReportDiagnostic("frames enabled — streaming");
+            StreamingBegan?.Invoke();
         }
 
         /// <inheritdoc />
@@ -134,11 +136,11 @@ namespace QuestVisionStream.Services
                 return;
             }
 
-            // Session start gate: user/profile requested + camera delivering frames
-            // + signaling open. The warm-up screen holds StreamingRequested false
-            // until the user confirms.
+            // Session start gate: camera delivering frames + signaling open. The
+            // session negotiates EAGERLY (during the warm-up screen) so the peer
+            // connection, data channel and ICE are all warmed and Connected before
+            // the user enters — consent gates the FRAMES below, not the plumbing.
             if (!sessionRequested &&
-                StreamingRequested &&
                 camera.State == CameraStreamState.Active &&
                 signaling.IsConnected)
             {
@@ -146,8 +148,11 @@ namespace QuestVisionStream.Services
                 return;
             }
 
-            // Frame pump.
+            // Frame pump — held until the user confirms (StreamingRequested): no
+            // camera pixels leave the device before Enter, even though the
+            // session is already negotiated.
             if (sessionRequested &&
+                StreamingRequested &&
                 transport.IsSessionActive &&
                 camera.State == CameraStreamState.Active)
             {

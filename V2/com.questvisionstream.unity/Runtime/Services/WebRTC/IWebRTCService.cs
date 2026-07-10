@@ -102,6 +102,9 @@ namespace QuestVisionStream.Services
     {
         event Action<WebRTCConnectionState> StateChanged;
 
+        /// <summary>The user confirmed — frames are now flowing (see <see cref="BeginStreaming"/>).</summary>
+        event Action StreamingBegan;
+
         /// <summary>
         /// Connection-progress detail ("offer sent", "answer received",
         /// "ICE: CHECKING"…) — tells a status surface WHERE a connection is,
@@ -118,14 +121,16 @@ namespace QuestVisionStream.Services
         string LastDiagnostic { get; }
 
         /// <summary>
-        /// Has streaming been requested? True from the start when the profile's
-        /// AutoStartSession is on; otherwise false until <see cref="BeginStreaming"/>.
+        /// Has the user (or the profile's AutoStartSession) enabled frame pushing?
+        /// The SESSION negotiates eagerly regardless — this only gates whether
+        /// camera pixels leave the device.
         /// </summary>
         bool StreamingRequested { get; }
 
         /// <summary>
-        /// Request the streaming session (the warm-up screen's Start button). The
-        /// session still waits for camera Active + signaling connected.
+        /// Enable the frame pump (the warm-up screen's Enter button). The session
+        /// is negotiated during warm-up, so when the connection shows Connected
+        /// this takes effect immediately — frames flow on the next pumped update.
         /// </summary>
         void BeginStreaming();
 
