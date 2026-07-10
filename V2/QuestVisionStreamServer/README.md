@@ -64,6 +64,7 @@ Health: `curl http://localhost:8080/` → `{"status":"ok","detector":"yolo","con
 | `QVS_ALLOWED_ORIGINS` | *(unset = any)* | Comma-separated `Origin` allowlist for the signaling WS |
 | `QVS_MAX_CONNECTIONS` | `1` | Session cap; a new connection supersedes the oldest |
 | `QVS_LOG_INTERVAL` | `30` | Frames between FPS log lines (clamped ≥ 1) |
+| `QVS_DETECTION_LOG` | *(unset = off; launch scripts default it)* | Path to a JSONL detection log — one line per payload sent to the client, for client-side comparison |
 
 > **Exposing the server beyond the LAN?** Set `QVS_AUTH_TOKEN` (append
 > `?token=…` to the signaling URL the client dials) and `QVS_ALLOWED_ORIGINS`
@@ -95,6 +96,37 @@ it, and future clients can use it to correlate detections with the exact capture
 frame (the groundwork for capture-pose alignment). `frame` counts frames
 *received*, so under load its gaps show how many stale frames were skipped by the
 latest-frame-wins scheduler.
+
+### Detection log (server-side, for client comparison)
+
+The server can write **one JSON line per payload it sends to a client** — the
+machine-readable counterpart to the throttled `[QVS ↓]` console summary. Each
+line wraps the exact wire payload plus send-side metadata:
+
+```json
+{"ts":"2026-07-06T18:57:01.123456+00:00","t_mono":950247.48,
+ "client":"user@example.com","count":1,
+ "payload":{"type":"detections","frame":123,"pts":369000,"width":640,"height":480,
+            "detections":[{"label":"cup","conf":0.82,"bbox":[x1,y1,x2,y2]}]}}
+```
+
+`payload` is byte-faithful to what the client receives, so a client-side capture
+can be diffed against it. Lines are logged only on a successful data-channel
+send, so the file mirrors the wire, not intent. `tail -f` shows detections live.
+
+**Two placement modes, by precedence:**
+
+1. **Per-connection folders (preferred).** When `QVS_DUMP_DIR` is set, each
+   connection gets its own subfolder `‹QVS_DUMP_DIR›/‹YYYYMMDD-HHMMSS›_‹client›/`
+   holding **both** its `detections.jsonl` **and** its captured frame JPEGs. The
+   folder is created lazily on the first capture, so idle/probe connections leave
+   nothing behind. Because `frame`/`pts` reset per WebRTC connection, this keeps
+   every session's data self-contained and collision-free — correlate the log
+   against the co-located frames within one folder.
+2. **Single shared file (fallback).** When `QVS_DUMP_DIR` is *unset* but
+   `QVS_DETECTION_LOG` is set (the launch scripts default it to
+   `.run/detections.jsonl`), all connections in a run append to that one file,
+   truncated per server run like `server.log`.
 
 ## Behaviour under load
 

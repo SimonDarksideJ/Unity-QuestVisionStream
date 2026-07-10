@@ -10,6 +10,8 @@
         "Unity.XR.ARSubsystems",
         "Unity.XR.CoreUtils",
         "Unity.InputSystem",
+        "UnityEngine.UI",
+        "XRTraining"
         "Unity.TextMeshPro",
         "Oculus.VR"
     ],

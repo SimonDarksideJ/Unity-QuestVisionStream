@@ -1,0 +1,65 @@
+{
+  "name": "Ethar Training Demo",
+  "steps": [
+    {
+      "waitingClass": "",
+      "title": "Welcome",
+      "description": "Ready to begin your Ethar training?",
+      "options": [ "Begin" ],
+      "detectedClass": "",
+      "label": "",
+      "imageRef": "camera",
+      "result": "begintraining"
+    },
+    {
+      "waitingClass": "begintraining",
+      "title": "Look for a Monitor",
+      "description": "Search your space and locate the monitor",
+      "options": [ "Search" ],
+      "detectedClass": "",
+      "label": "",
+      "imageRef": "camera",
+      "result": "tv"
+    },
+    {
+      "waitingClass": "tv",
+      "title": "Found TV",
+      "description": "You found the TV, can you now locate a person",
+      "options": [ "Next" ],
+      "detectedClass": "tv",
+      "label": "This is a tv",
+      "imageRef": "camera",
+      "result": "foundtv"
+    },
+    {
+      "waitingClass": "foundtv",
+      "title": "",
+      "description": "",
+      "options": [],
+      "detectedClass": "",
+      "label": "",
+      "imageRef": "",
+      "result": "person"
+    },
+    {
+      "waitingClass": "person",
+      "title": "Found Person",
+      "description": "You found a person",
+      "options": [ "Finish" ],
+      "detectedClass": "person",
+      "label": "This is a person",
+      "imageRef": "camera",
+      "result": "finishtraining"
+    },
+    {
+      "waitingClass": "finishtraining",
+      "title": "Complete",
+      "description": "You have found everything and the course is complete",
+      "options": [ "End" ],
+      "detectedClass": "",
+      "label": "",
+      "imageRef": "camera",
+      "result": ""
+    }
+  ]
+}

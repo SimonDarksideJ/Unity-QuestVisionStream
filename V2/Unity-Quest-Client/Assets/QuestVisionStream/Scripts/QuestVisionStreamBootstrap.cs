@@ -77,6 +77,19 @@ namespace QuestVisionStream.Client
         [Tooltip("Actually pause frame pushes on low quality. OFF by default — the raw passthrough feed reads darker than the tone-mapped view.")]
         private bool gateStreamingOnQuality = false;
 
+        [Header("Training")]
+        [SerializeField]
+        [Tooltip("Register the training state + presentation services (the authoritative training flow driven by detections).")]
+        private bool enableTraining = true;
+
+        [SerializeField]
+        [Tooltip("Scenario queue JSON (see Documentation/Training-Flow.md). Empty loads Resources/EtharTrainingScenario, falling back to the built-in demo.")]
+        private TextAsset trainingScenarioJson;
+
+        [SerializeField]
+        [Tooltip("Built-in XRTraining palette for the training UX: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
+        private int trainingThemeIndex = 0;
+
         [Header("AprilTags")]
         [SerializeField]
         private bool enableAprilTags = true;
@@ -430,6 +443,23 @@ namespace QuestVisionStream.Client
             serviceManager.TryCreateAndRegisterService<IAnchoredTagRenderModule>(
                 typeof(AnchoredTagRenderModule), out _,
                 AnchoredModuleName, 1u, anchoredProfile, rendererService);
+
+            // --- Training flow (45-46): state queue + presentation UX ---
+            if (enableTraining)
+            {
+                var trainingStateProfile = ScriptableObject.CreateInstance<TrainingStateServiceProfile>();
+                trainingStateProfile.ScenarioJson = trainingScenarioJson != null
+                    ? trainingScenarioJson
+                    : Resources.Load<TextAsset>("EtharTrainingScenario");
+                serviceManager.TryCreateAndRegisterService<ITrainingStateService>(
+                    typeof(TrainingStateService), out _, "Training State", 45u, trainingStateProfile);
+
+                var trainingPresentationProfile = ScriptableObject.CreateInstance<TrainingPresentationServiceProfile>();
+                trainingPresentationProfile.ThemeIndex = trainingThemeIndex;
+                trainingPresentationProfile.LabelPlacementDistanceMeters = placementDistanceMeters;
+                serviceManager.TryCreateAndRegisterService<ITrainingPresentationService>(
+                    typeof(TrainingPresentationService), out _, "Training Presentation", 46u, trainingPresentationProfile);
+            }
 
             // --- AprilTags (40-42) ---
             if (enableAprilTags)

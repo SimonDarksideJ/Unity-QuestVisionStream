@@ -44,6 +44,34 @@ def _get_inference_pool() -> ThreadPoolExecutor:
     return _inference_pool
 
 
+def configure_ffmpeg_logging(level: str) -> None:
+    """Set the global libav/libswscale log threshold (PyAV).
+
+    ``frame.to_ndarray("bgr24")`` builds a fresh libswscale context per frame,
+    and each one emits a one-off ``[swscaler] No accelerated colorspace
+    conversion found from yuv420p to bgr24`` at WARNING level — thousands of
+    identical, benign lines that bury the real logs. Dropping the threshold to
+    ``error`` (the default) suppresses these while keeping genuine ffmpeg errors.
+    Best-effort: a missing/renamed API must never stop the server starting.
+    """
+    try:
+        import av.logging as av_log
+
+        levels = {
+            "quiet": av_log.PANIC,
+            "panic": av_log.PANIC,
+            "fatal": av_log.FATAL,
+            "error": av_log.ERROR,
+            "warning": av_log.WARNING,
+            "info": av_log.INFO,
+            "verbose": av_log.VERBOSE,
+            "debug": av_log.DEBUG,
+        }
+        av_log.set_level(levels.get((level or "").strip().lower(), av_log.ERROR))
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[VideoProcessor] Could not set ffmpeg log level {level!r}: {exc}")
+
+
 class VideoProcessor:
     def __init__(self, config: ServerConfig, detect: DetectFn, send: SendFn) -> None:
         self.config = config
@@ -66,13 +94,21 @@ class VideoProcessor:
         self._recv_window_dropped_start = 0
         self._last_sent_log = 0.0
         self._sent_window_processed_start = 0
-        # Darkness/what-am-I-seeing diagnostic: set QVS_DUMP_DIR to a folder and
-        # the processor writes a JPEG of the actual received frame every ~2 s
-        # (filename carries the mean luma). Ground truth for "too dark" / "nothing
-        # found" — the raw getUserMedia passthrough frame is often much darker
-        # than the tone-mapped view you see through the headset.
-        self._dump_dir = os.getenv("QVS_DUMP_DIR", "").strip()
+        # Darkness/what-am-I-seeing diagnostic: with a capture dir configured
+        # (QVS_DUMP_DIR) the processor writes a JPEG of the actual received frame
+        # every ~2 s (filename carries the mean luma). Ground truth for "too dark"
+        # / "nothing found" — the raw getUserMedia passthrough frame is often much
+        # darker than the tone-mapped view you see through the headset. The WebRTC
+        # server overrides this with a per-connection subfolder via
+        # set_capture_dir so sessions never collide.
+        self._dump_dir = config.capture_dir.strip()
         self._last_dump = 0.0
+
+    def set_capture_dir(self, path: str) -> None:
+        """Point frame dumps at a per-connection folder (created lazily on the
+        first write). The WebRTC server calls this so each session's captures and
+        its detection log live together under one dated, client-named folder."""
+        self._dump_dir = (path or "").strip()
 
     def _preprocess(self, frame) -> np.ndarray | None:
         try:

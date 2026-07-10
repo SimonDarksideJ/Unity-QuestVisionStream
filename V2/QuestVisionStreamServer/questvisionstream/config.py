@@ -70,6 +70,24 @@ class ServerConfig:
     enable_display: bool = field(default_factory=lambda: _env_bool("QVS_ENABLE_DISPLAY", False))
     log_interval: int = field(default_factory=lambda: _env_int("QVS_LOG_INTERVAL", 30, minimum=1))
 
+    # Base folder for diagnostic frame captures. When set, EACH connection gets
+    # its own subfolder here (named <start-time>_<client>) holding that session's
+    # captured JPEGs *and* its detection log together — so sessions never collide
+    # (frame numbers and pts reset per peer connection). Empty = no capture.
+    capture_dir: str = field(default_factory=lambda: _env_str("QVS_DUMP_DIR", ""))
+
+    # Fallback machine-readable detection log used ONLY when capture_dir is unset:
+    # a single JSONL file (all connections in a run appended) for frame-for-frame
+    # comparison against a client-side capture. When capture_dir IS set, the
+    # per-connection logs under it supersede this. Empty = disabled.
+    detection_log: str = field(default_factory=lambda: _env_str("QVS_DETECTION_LOG", ""))
+
+    # libav/libswscale (PyAV) console verbosity. Default "error" silences the
+    # benign, per-frame "[swscaler] No accelerated colorspace conversion from
+    # yuv420p to bgr24" WARNING that otherwise floods the log; set "warning" or
+    # higher to bring ffmpeg diagnostics back.
+    ffmpeg_log_level: str = field(default_factory=lambda: _env_str("QVS_FFMPEG_LOG_LEVEL", "error"))
+
     # Session security. All default open for trusted-LAN use; set them when the
     # server is reachable beyond the LAN (tunnel, port-forward, public host).
     #
