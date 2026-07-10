@@ -10,16 +10,22 @@ using UnityEngine.UI;
 namespace QuestVisionStream.Client
 {
     /// <summary>
-    /// A head-locked, in-headset detection feed for live testing: a translucent
-    /// panel pinned to the left third of the view that lists every detection in the
-    /// most recent server payload — class, confidence and an approximate on-screen
-    /// location (both a coarse "top-left" descriptor and the raw normalized centre).
+    /// THE in-headset log window — the single surface for all logging/messaging
+    /// (the only other world text is the detector tags on objects): a translucent
+    /// panel pinned to the left third of the view with
     ///
-    /// This is deliberately a READ-OUT of what the client actually received, not of
-    /// what it drew: if this panel shows detections but no boxes appear in the world,
-    /// the fault is downstream of arrival (pose snapshot, render module, or the
-    /// unprojection), not in the network/detection path. Created and parented to the
-    /// camera by <see cref="QuestVisionStreamBootstrap"/>.
+    ///   - the live detection feed: every detection in the most recent server
+    ///     payload — class, confidence and an approximate on-screen location;
+    ///   - a status/diagnostics section at the bottom: the status model's
+    ///     headline + per-field entries, the resolved server, and the WebRTC
+    ///     state with its last connection diagnostic (formerly the floating
+    ///     status headline and the warm-up screen's debug TextMesh).
+    ///
+    /// The feed is deliberately a READ-OUT of what the client actually received,
+    /// not of what it drew: if this panel shows detections but no boxes appear in
+    /// the world, the fault is downstream of arrival (pose snapshot, render
+    /// module, or the unprojection), not in the network/detection path. Created
+    /// and parented to the camera by <see cref="QuestVisionStreamBootstrap"/>.
     /// </summary>
     [AddComponentMenu("")]
     public sealed class DetectionHudController : MonoBehaviour
@@ -33,6 +39,9 @@ namespace QuestVisionStream.Client
         private IDetectionRendererService renderer;
         private IPoseTrackingService pose;
         private IAnchoredTagRenderModule anchored;
+        private IStatusService status;
+        private IWebRTCService webrtc;
+        private ISignalingService signaling;
 
         // Left-third placement. The panel is head-locked at HeadDistanceMeters, its
         // centre pushed left so the card sits in the left band of the field of view.
@@ -47,17 +56,29 @@ namespace QuestVisionStream.Client
 
         private Text headerText;
         private Text bodyText;
+        private Text statusText;
 
         private string pendingHeader;
         private string pendingBody;
         private bool dirty;
+        private float nextStatusRefreshRealtime;
 
-        public void Initialize(IDetectionService detectionService, IDetectionRendererService rendererService = null, IPoseTrackingService poseService = null, IAnchoredTagRenderModule anchoredModule = null)
+        public void Initialize(
+            IDetectionService detectionService,
+            IDetectionRendererService rendererService = null,
+            IPoseTrackingService poseService = null,
+            IAnchoredTagRenderModule anchoredModule = null,
+            IStatusService statusService = null,
+            IWebRTCService webrtcService = null,
+            ISignalingService signalingService = null)
         {
             detections = detectionService;
             renderer = rendererService;
             pose = poseService;
             anchored = anchoredModule;
+            status = statusService;
+            webrtc = webrtcService;
+            signaling = signalingService;
             BuildPanel();
 
             pendingHeader = "DETECTIONS";
@@ -80,6 +101,13 @@ namespace QuestVisionStream.Client
 
         private void Update()
         {
+            // Status/diagnostics section — polled, like the old surfaces it replaces.
+            if (status != null && Time.realtimeSinceStartup >= nextStatusRefreshRealtime)
+            {
+                nextStatusRefreshRealtime = Time.realtimeSinceStartup + 0.25f;
+                statusText.text = BuildStatusText();
+            }
+
             // The detection event fires on the Unity main thread, but apply the text
             // in Update so a burst of payloads only costs one Text rebuild per frame.
             if (!dirty)
@@ -90,6 +118,41 @@ namespace QuestVisionStream.Client
             dirty = false;
             headerText.text = pendingHeader;
             bodyText.text = pendingBody;
+        }
+
+        /// <summary>The status section: headline, per-field entries, server, WebRTC diagnostics.</summary>
+        private string BuildStatusText()
+        {
+            var builder = new StringBuilder(256);
+            var headline = status.Model.Headline();
+            builder.Append("STATUS  ·  ").Append(string.IsNullOrEmpty(headline) ? "healthy" : headline).Append('\n');
+
+            if (signaling != null)
+            {
+                builder.Append("server: ").Append(signaling.CurrentServerDisplay ?? "unresolved").Append('\n');
+            }
+
+            foreach (var field in new[]
+                     {
+                         StatusModel.Fields.Signaling,
+                         StatusModel.Fields.Camera,
+                         StatusModel.Fields.Connection,
+                         StatusModel.Fields.Quality,
+                         StatusModel.Fields.Detections,
+                         StatusModel.Fields.Server,
+                         StatusModel.Fields.Device
+                     })
+            {
+                var entry = status.Model.Get(field);
+                builder.Append(field).Append(": ").Append(entry.HasValue ? entry.Value.Value : "—").Append('\n');
+            }
+
+            if (webrtc != null)
+            {
+                builder.Append("webrtc: ").Append(webrtc.State).Append(" · ").Append(webrtc.LastDiagnostic);
+            }
+
+            return builder.ToString();
         }
 
         private void OnDetections(DetectionArrival arrival)
@@ -171,11 +234,22 @@ namespace QuestVisionStream.Client
             var card = CreatePanel(canvasRect, "Card", PanelColor);
             Stretch(card);
 
-            headerText = CreateText(card, "Header", 26, FontStyle.Bold, TextColor, TextAnchor.UpperLeft);
-            Place(headerText, new Vector2(0f, 1f), new Vector2(18, -14), new Vector2(PanelWidthMeters / WorldScale - 36, 90));
+            var innerWidth = PanelWidthMeters / WorldScale - 36;
 
+            headerText = CreateText(card, "Header", 26, FontStyle.Bold, TextColor, TextAnchor.UpperLeft);
+            Place(headerText, new Vector2(0f, 1f), new Vector2(18, -14), new Vector2(innerWidth, 90));
+
+            // Bottom band: the status/diagnostics section (the log window's second half).
+            const float statusHeight = 270f;
             bodyText = CreateText(card, "Body", 22, FontStyle.Normal, TextColor, TextAnchor.UpperLeft);
-            Place(bodyText, new Vector2(0f, 1f), new Vector2(18, -110), new Vector2(PanelWidthMeters / WorldScale - 36, PanelHeightMeters / WorldScale - 130));
+            Place(bodyText, new Vector2(0f, 1f), new Vector2(18, -110), new Vector2(innerWidth, PanelHeightMeters / WorldScale - 130 - statusHeight));
+
+            statusText = CreateText(card, "Status", 19, FontStyle.Normal, DimTextColor, TextAnchor.LowerLeft);
+            var statusRect = (RectTransform)statusText.transform;
+            statusRect.anchorMin = statusRect.anchorMax = new Vector2(0f, 0f);
+            statusRect.pivot = new Vector2(0f, 0f);
+            statusRect.anchoredPosition = new Vector2(18, 14);
+            statusRect.sizeDelta = new Vector2(innerWidth, statusHeight - 24);
         }
 
         private static RectTransform CreatePanel(RectTransform parent, string name, Color color)

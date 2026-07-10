@@ -1,8 +1,6 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
-using System.Text;
-using QuestVisionStream.Core;
 using QuestVisionStream.Protocol;
 using QuestVisionStream.Services;
 using UnityEngine;
@@ -25,9 +23,10 @@ namespace QuestVisionStream.Client
     ///     connected", and the VPN/server failure hint.
     ///   - Card hides once the streaming session starts.
     ///
-    /// Activation is the right-controller A button (acts ONLY while the button is
-    /// enabled — same contract as a disabled DOM button); B toggles the live
-    /// debug panel. No interaction-toolkit dependency.
+    /// Activation is the controller laser (trigger) or the right-controller A
+    /// button (acts ONLY while the button is enabled — same contract as a
+    /// disabled DOM button). Status/diagnostics live in the detection HUD log
+    /// window — this card renders no free-floating debug text.
     /// </summary>
     [AddComponentMenu("")]
     public sealed class StartupFlowController : MonoBehaviour
@@ -52,16 +51,12 @@ namespace QuestVisionStream.Client
         private Text buttonText;
         private Image buttonImage;
         private Text noteText;
-        private TextMesh debugText;
-        private GameObject debugRoot;
 
         private InputAction enterAction;
-        private InputAction debugAction;
 
         private bool buttonEnabled;
         private bool starting;
         private bool started;
-        private bool debugVisible;
         private int lastCloseCode;
         private float nextRefreshRealtime;
 
@@ -86,18 +81,10 @@ namespace QuestVisionStream.Client
             webrtc.StateChanged += OnWebRTCStateChanged;
 
             BuildIntroCard();
-            BuildDebugPanel();
 
             enterAction = new InputAction("QVS Enter", InputActionType.Button, "<XRController>{RightHand}/primaryButton");
-            // B (right secondary) is now the anchored-tag behaviour toggle (bootstrap),
-            // so the warm-up debug panel moves to the right thumbstick click.
-            debugAction = new InputAction("QVS Debug", InputActionType.Button);
-            debugAction.AddBinding("<XRController>{RightHand}/thumbstickClicked");
-            debugAction.AddBinding("<XRController>{RightHand}/primary2DAxisClick");
             enterAction.performed += _ => OnEnterPressed();
-            debugAction.performed += _ => debugVisible = !debugVisible;
             enterAction.Enable();
-            debugAction.Enable();
 
             Render();
         }
@@ -116,7 +103,6 @@ namespace QuestVisionStream.Client
             }
 
             enterAction?.Dispose();
-            debugAction?.Dispose();
         }
 
         private void Update()
@@ -131,12 +117,6 @@ namespace QuestVisionStream.Client
             // Camera readiness feeds the "Checking camera…" tier (the web's
             // isSessionSupported query resolves once; camera state can change, so poll).
             Render();
-
-            debugRoot.SetActive(debugVisible);
-            if (debugVisible)
-            {
-                debugText.text = BuildDebugText();
-            }
         }
 
         // ---- the wireIntro state machine, ported ----
@@ -173,7 +153,17 @@ namespace QuestVisionStream.Client
                 return;
             }
 
-            // Tier 3+ — connection-driven, verbatim from the web intro.
+            // Tier 3 — the session negotiates during this warm-up screen, so Enter
+            // only lights up once the peer connection is fully warmed: by the time
+            // the user can press it, frames flow instantly.
+            if (conn == Conn.Connected && webrtc.State != WebRTCConnectionState.Connected)
+            {
+                SetButton("Negotiating…", false);
+                SetNote("Warming up the vision stream…", false);
+                return;
+            }
+
+            // Tier 4 — connection-driven, verbatim from the web intro.
             SetButton(conn == Conn.Connecting ? "Connecting…" : "Enter", conn == Conn.Connected);
 
             if (conn == Conn.Connected)
@@ -211,6 +201,8 @@ namespace QuestVisionStream.Client
         {
             if (!starting)
             {
+                // Warm-up negotiation progress — flips Negotiating… ⇄ Enter.
+                Render();
                 return;
             }
 
@@ -241,6 +233,16 @@ namespace QuestVisionStream.Client
             starting = true;
             Render();
             webrtc.BeginStreaming();
+
+            // The session was negotiated during warm-up, so Connected is normally
+            // already true here — enter immediately instead of waiting for a state
+            // change that will never fire.
+            if (webrtc.State == WebRTCConnectionState.Connected)
+            {
+                starting = false;
+                started = true;
+                Render();
+            }
         }
 
         private void SetButton(string label, bool enabled)
@@ -267,6 +269,11 @@ namespace QuestVisionStream.Client
 
             var canvas = introRoot.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
+            canvas.worldCamera = Camera.main;
+            // Point-and-click on the Enter button with the controller laser; the
+            // (A) hardware shortcut stays as the fallback.
+            ControllerUiPointer.EnsureSetup();
+            ControllerUiPointer.RegisterCanvas(introRoot);
             var canvasRect = (RectTransform)introRoot.transform;
             canvasRect.sizeDelta = new Vector2(620, 400);
             introRoot.transform.localScale = Vector3.one * 0.0012f;
@@ -294,49 +301,6 @@ namespace QuestVisionStream.Client
             var note = CreateText(card, "Note", string.Empty, 17, FontStyle.Normal, NoteColor);
             Place(note, new Vector2(0.5f, 1f), new Vector2(0, -335), new Vector2(560, 60));
             noteText = note.GetComponent<Text>();
-
-            var hint = CreateText(card, "Hint", "( stick-click )  debug status", 14, FontStyle.Normal, SubColor);
-            Place(hint, new Vector2(0.5f, 0f), new Vector2(0, 18), new Vector2(560, 24));
-        }
-
-        private void BuildDebugPanel()
-        {
-            debugRoot = new GameObject("QVS_Debug");
-            debugRoot.transform.SetParent(transform, false);
-            debugRoot.transform.localPosition = new Vector3(-0.35f, 0.05f, 1.2f);
-            debugText = debugRoot.AddComponent<TextMesh>();
-            debugText.characterSize = 0.014f;
-            debugText.fontSize = 48;
-            debugText.anchor = TextAnchor.MiddleLeft;
-            debugText.alignment = TextAlignment.Left;
-            debugText.color = Color.white;
-            debugRoot.SetActive(false);
-        }
-
-        private string BuildDebugText()
-        {
-            var builder = new StringBuilder();
-            builder.AppendLine("QVS DEBUG");
-            builder.AppendLine();
-            builder.AppendLine($"server:     {signaling.CurrentServerDisplay ?? "unresolved"}");
-
-            foreach (var field in new[]
-                     {
-                         StatusModel.Fields.Signaling,
-                         StatusModel.Fields.Camera,
-                         StatusModel.Fields.Connection,
-                         StatusModel.Fields.Quality,
-                         StatusModel.Fields.Detections,
-                         StatusModel.Fields.Server,
-                         StatusModel.Fields.Device
-                     })
-            {
-                var entry = status.Model.Get(field);
-                builder.AppendLine($"{field}: {(entry.HasValue ? entry.Value.Value : "—")}");
-            }
-
-            builder.Append($"webrtc:     {webrtc.State} · {webrtc.LastDiagnostic}");
-            return builder.ToString();
         }
 
         // ---- tiny uGUI helpers ----

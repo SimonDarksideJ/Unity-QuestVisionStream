@@ -148,13 +148,19 @@ namespace QuestVisionStream.Client
             if (camera != null &&
                 serviceManager.TryGetService<IStatusService>(out var status))
             {
-                var hud = new GameObject("QVS_StatusHud");
-                hud.transform.SetParent(camera.transform, false);
-                hud.AddComponent<StatusHudController>().Initialize(status);
+                serviceManager.TryGetService<IWebRTCService>(out var webrtcService);
+                serviceManager.TryGetService<ISignalingService>(out var signalingService);
 
-                // Live detection feed HUD — left-third translucent panel that lists
-                // the classes and approximate on-screen locations of everything the
-                // client received this frame (a test read-out of the arrival path).
+                // At-a-glance connection dot (green/red, top right). Text-free — all
+                // logging/messaging lives in the log window below.
+                var connectionDot = new GameObject("QVS_ConnectionDot");
+                connectionDot.transform.SetParent(camera.transform, false);
+                connectionDot.AddComponent<ConnectionDotController>().Initialize(status);
+
+                // THE log window: the left-third translucent panel with the live
+                // detection feed plus the status/diagnostics section. All logging/
+                // messaging lands here — no free-floating 3D text; the only other
+                // world text is the detector tags on objects.
                 if (serviceManager.TryGetService<IDetectionService>(out var detectionService))
                 {
                     serviceManager.TryGetService<IDetectionRendererService>(out var rendererService);
@@ -162,13 +168,14 @@ namespace QuestVisionStream.Client
                     serviceManager.TryGetService<IAnchoredTagRenderModule>(out var anchoredModule);
                     var detectionHud = new GameObject("QVS_DetectionHud");
                     detectionHud.transform.SetParent(camera.transform, false);
-                    detectionHud.AddComponent<DetectionHudController>().Initialize(detectionService, rendererService, poseTracking, anchoredModule);
+                    detectionHud.AddComponent<DetectionHudController>().Initialize(
+                        detectionService, rendererService, poseTracking, anchoredModule,
+                        status, webrtcService, signalingService);
                 }
 
-                // Warm-up flow: confirm the connection, then (A) starts streaming,
-                // (B) toggles the live debug panel.
-                if (serviceManager.TryGetService<IWebRTCService>(out var webrtcService) &&
-                    serviceManager.TryGetService<ISignalingService>(out var signalingService) &&
+                // Warm-up flow: confirm the connection, then Enter/(A) starts frames.
+                if (webrtcService != null &&
+                    signalingService != null &&
                     serviceManager.TryGetService<ICameraStreamService>(out var cameraService))
                 {
                     var warmup = new GameObject("QVS_StartupFlow");
@@ -405,7 +412,9 @@ namespace QuestVisionStream.Client
             webrtcProfile.TargetFps = targetFps;
             webrtcProfile.SendEveryNthFrame = sendEveryNthFrame;
             webrtcProfile.GateStreamingOnQuality = gateStreamingOnQuality;
-            // Warm-up screen: nothing streams until the user confirms with (A).
+            // Warm-up screen: the session negotiates eagerly (connection warmed and
+            // READY behind the card), but no camera frames leave the device until
+            // the user confirms with Enter / (A).
             webrtcProfile.AutoStartSession = false;
             serviceManager.TryCreateAndRegisterService<IWebRTCService>(
                 typeof(WebRTCService), out var webrtcService, "WebRTC", 20u, webrtcProfile);
