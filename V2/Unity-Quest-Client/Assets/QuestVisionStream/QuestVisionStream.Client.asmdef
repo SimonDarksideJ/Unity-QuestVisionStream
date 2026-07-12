@@ -2,6 +2,8 @@
     "name": "QuestVisionStream.Client",
     "rootNamespace": "QuestVisionStream.Client",
     "references": [
+        "Ethar.DebugDrawingBBox",
+        "Ethar.TrainingStateMachine",
         "QuestVisionStream.Unity",
         "QuestVisionStream.Unity.Tags.Keijiro",
         "RealityCollective.ServiceFramework",
@@ -11,7 +13,7 @@
         "Unity.XR.CoreUtils",
         "Unity.InputSystem",
         "UnityEngine.UI",
-        "XRTraining",
+        "Ethar.UXTraining",
         "Unity.TextMeshPro",
         "Oculus.VR"
     ],

@@ -25,8 +25,8 @@ IImageQualifierService (15)   ── IImageQualifierModule: BrightnessQualifierM
 IWebRTCService (20)           ── IWebRTCTransportModule: AndroidWebRTCTransportModule
 IPoseTrackingService (25)     pose history + pts latency (pose-freeze)
 IDetectionService (30)        validate/parse → normalized RenderBatch
-IDetectionRendererService (35)── IDetectionRenderModule: EphemeralBoxRenderModule (package)
-                                                          AnchoredTagRenderModule (app)
+IDetectionRendererService (35)── IDetectionRenderModule: EphemeralBoxRenderModule (com.ethar.debugdrawingbbox)
+                                                          AnchoredTagRenderModule (com.ethar.debugdrawingbbox)
 ITagDetectionService (40)     ── ITagDetectorModule: KeijiroAprilTagDetectorModule (41h12)
 ITagRoutingService (41)       enter/update/exit + rules ("see X → do Y")
 ITagPlacementService (42)     coloured tag markers
@@ -146,7 +146,12 @@ nullable `pts` (drives the latency estimator), per-payload width/height
 normalization with `invertY` default on, `status` uplink + 15 s `__keepalive`.
 See [Configuration-and-Connectivity](Configuration-and-Connectivity.md).
 
-## Detection rendering — two switchable modes
+## Detection rendering — two switchable modes (`com.ethar.debugdrawingbbox`)
+
+The whole drawing system — renderer service, both render modules, the
+environment-depth sampler, the URP/XR-safe `UnlitMaterialFactory` and the
+editor drawing test harness — lives in the `com.ethar.debugdrawingbbox`
+package (namespace `Ethar.DebugDrawingBBox`).
 
 - **Ephemeral Boxes** (default; WebXR-client parity): each payload redraws
   hollow outline boxes + billboarded `label 82%` text, corners unprojected

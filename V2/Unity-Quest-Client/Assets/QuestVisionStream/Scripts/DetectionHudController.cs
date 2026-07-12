@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
 using System.Text;
+using Ethar.DebugDrawingBBox;
 using QuestVisionStream.Core;
 using QuestVisionStream.Services;
 using UnityEngine;

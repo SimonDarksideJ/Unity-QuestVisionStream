@@ -1,6 +1,6 @@
 ﻿<Solution>
   <Project Path="QuestVisionStream.Client.csproj" />
-  <Project Path="XRTraining.csproj" />
+  <Project Path="Ethar.UXTraining.csproj" />
   <Project Path="QuestVisionStream.Unity.csproj" />
   <Project Path="QuestVisionStream.Unity.Tags.Keijiro.csproj" />
   <Project Path="QuestVisionStream.Unity.Editor.csproj" />

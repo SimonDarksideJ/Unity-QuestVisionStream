@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
 using System;
+using Ethar.Training;
 using QuestVisionStream.Core;
 using QuestVisionStream.Protocol;
 using QuestVisionStream.Training;
@@ -30,11 +31,32 @@ namespace QuestVisionStream.Services
         public TrainingScenarioAsset Scenario { get => scenario; set => scenario = value; }
         public float MinimumDetectionConfidence { get => minimumDetectionConfidence; set => minimumDetectionConfidence = value; }
         public bool VerboseLogging { get => verboseLogging; set => verboseLogging = value; }
+
+        /// <summary>
+        /// Convert the authored ScriptableObject profile into the serializable
+        /// <see cref="TrainingStateMachineConfig"/> struct the engine-agnostic
+        /// state machine is initialized with. An unset or empty scenario asset
+        /// falls back to the built-in demo scenario.
+        /// </summary>
+        public TrainingStateMachineConfig ToConfig()
+        {
+            var scenarioData = scenario != null && scenario.Steps.Count > 0
+                ? scenario.ToScenarioData()
+                : TrainingScenarioLibrary.EtharDemoData();
+
+            return new TrainingStateMachineConfig
+            {
+                Scenario = scenarioData,
+                MinimumDetectionConfidence = minimumDetectionConfidence
+            };
+        }
     }
 
     /// <summary>
-    /// <see cref="ITrainingStateService"/>: wraps the pure
-    /// <see cref="TrainingStateMachine"/> and wires it to the detection pipeline.
+    /// <see cref="ITrainingStateService"/>: wraps the engine-agnostic
+    /// <see cref="TrainingStateMachine"/> (from <c>com.ethar.trainingstatemachine</c>)
+    /// and wires it to the detection pipeline. The ScriptableObject profile is
+    /// converted to the machine's serializable config struct at initialization.
     /// Every detections batch flows through <see cref="ProcessBatch"/>; training
     /// form responses are converted to a wire-shaped detections payload
     /// (<see cref="TrainingResponseMessage"/>) and pushed through the SAME parser
@@ -68,7 +90,7 @@ namespace QuestVisionStream.Services
         public TrainingStep CurrentStep => machine.CurrentStep;
         public int CurrentStepIndex => machine.CurrentStepIndex;
         public string ExpectedClass => machine.ExpectedClass;
-        public long DiscardedCount { get; private set; }
+        public long DiscardedCount => machine.DiscardedCount;
 
         /// <inheritdoc />
         public override void Start()
@@ -184,9 +206,10 @@ namespace QuestVisionStream.Services
 
         /// <summary>
         /// The single class-arrival handler — real detections and synthetic action
-        /// responses both land here. The hot path is one cached-string comparison
-        /// per detection; everything that doesn't match the expected state (or the
-        /// active step's annotated class) is discarded without touching the table.
+        /// responses both land here. Each detection is offered to the state
+        /// machine, whose hot path is one cached-string comparison; the machine's
+        /// result report is enriched with the detection's geometry for the
+        /// presentation events.
         /// </summary>
         private void ProcessBatch(RenderBatch batch, double arrivalTimeMs, TrainingClassSource source)
         {
@@ -195,46 +218,34 @@ namespace QuestVisionStream.Services
                 return;
             }
 
-            var minConf = source == TrainingClassSource.Detection ? profile.MinimumDetectionConfidence : 0f;
-
             foreach (var detection in batch.Detections)
             {
-                if (detection.Conf < minConf)
-                {
-                    continue;
-                }
+                var result = machine.ProcessClass(detection.Label, detection.Conf, source);
 
                 // Keep the world label tracking the active step's annotated class.
-                if (machine.MatchesCurrentDetectedClass(detection.Label))
+                if (result.SightedCurrentClass)
                 {
                     CurrentClassSighted?.Invoke(new TrainingDetectionMatch(
                         detection.Label, detection.Conf, detection.Center, detection.Rect, arrivalTimeMs, source));
                 }
 
-                if (!machine.MatchesExpected(detection.Label))
+                if (result.Outcome == TrainingProcessOutcome.Completed)
                 {
-                    DiscardedCount++;
-                    continue;
-                }
-
-                var match = new TrainingDetectionMatch(
-                    detection.Label, detection.Conf, detection.Center, detection.Rect, arrivalTimeMs, source);
-                var advance = machine.Offer(detection.Label, source);
-                if (advance == null)
-                {
-                    DiscardedCount++;
-                    continue;
-                }
-
-                if (advance.Completed)
-                {
-                    Log($"scenario complete on '{advance.ArrivedClass}' ({source})");
+                    Log($"scenario complete on '{result.Advance.ArrivedClass}' ({source})");
                     ScenarioCompleted?.Invoke();
                     return;
                 }
 
+                if (result.Outcome != TrainingProcessOutcome.Advanced)
+                {
+                    continue;
+                }
+
+                var advance = result.Advance;
+                var match = new TrainingDetectionMatch(
+                    detection.Label, detection.Conf, detection.Center, detection.Rect, arrivalTimeMs, source);
                 Log($"'{advance.ArrivedClass}' ({source}) → step {advance.StepIndex + 1}/{machine.Scenario.Steps.Count} " +
-                    $"'{advance.Step.Title}', expecting '{machine.ExpectedClass}', discarded so far {DiscardedCount}");
+                    $"'{advance.Step.Title}', expecting '{machine.ExpectedClass}', discarded so far {machine.DiscardedCount}");
                 StepActivated?.Invoke(new TrainingStepActivation(
                     advance.Step, advance.StepIndex, machine.Scenario.Steps.Count, match));
 
@@ -246,18 +257,15 @@ namespace QuestVisionStream.Services
 
         private void LoadConfiguredScenario()
         {
-            if (profile.Scenario != null)
+            if (profile.Scenario != null && profile.Scenario.Steps.Count == 0)
             {
-                if (profile.Scenario.Steps.Count > 0)
-                {
-                    LoadScenario(profile.Scenario.ToScenario());
-                    return;
-                }
-
                 Debug.LogWarning($"[QVS:Training] '{profile.Scenario.name}' has no steps — falling back to the built-in demo scenario");
             }
 
-            LoadScenario(TrainingScenarioLibrary.EtharDemo());
+            // ScriptableObject profile → serializable config struct → machine.
+            machine.Initialize(profile.ToConfig());
+            Log($"scenario '{machine.Scenario.Name}' loaded ({machine.Scenario.Steps.Count} steps)");
+            ScenarioLoaded?.Invoke(machine.Scenario);
         }
 
         private void Log(string message)

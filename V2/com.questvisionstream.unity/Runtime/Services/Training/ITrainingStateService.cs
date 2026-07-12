@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
 using System;
+using Ethar.Training;
 using QuestVisionStream.Core;
 using QuestVisionStream.Training;
 using RealityCollective.ServiceFramework.Interfaces;

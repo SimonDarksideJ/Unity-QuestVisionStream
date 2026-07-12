@@ -1,6 +1,7 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
+using Ethar.DebugDrawingBBox;
 using QuestVisionStream.Core;
 using QuestVisionStream.Services;
 using QuestVisionStream.Training;
@@ -88,7 +89,7 @@ namespace QuestVisionStream.Client
         private TrainingScenarioAsset trainingScenario;
 
         [SerializeField]
-        [Tooltip("Built-in XRTraining palette for the training UX: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
+        [Tooltip("Built-in Ethar UX Training palette for the training UX: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
         private int trainingThemeIndex = 0;
 
         [Header("AprilTags")]

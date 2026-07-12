@@ -2,13 +2,14 @@
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
 using System;
+using Ethar.UXTraining;
+using Ethar.UXTraining.Components;
+using Ethar.UXTraining.Theme;
+using Ethar.Training;
 using QuestVisionStream.Services;
-using QuestVisionStream.Training;
 using RealityCollective.ServiceFramework.Definitions;
 using RealityCollective.ServiceFramework.Services;
 using UnityEngine;
-using XRTraining.Components;
-using XRTraining.Theme;
 
 namespace QuestVisionStream.Client
 {
@@ -17,7 +18,7 @@ namespace QuestVisionStream.Client
     public class TrainingPresentationServiceProfile : BaseProfile
     {
         [SerializeField]
-        [Tooltip("Built-in XRTraining palette: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
+        [Tooltip("Built-in Ethar UX Training palette: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
         private int themeIndex = 0;
 
         [SerializeField]
@@ -40,12 +41,14 @@ namespace QuestVisionStream.Client
 
     /// <summary>
     /// <see cref="ITrainingPresentationService"/>: receives UX requests from the
-    /// training state flow and drives <see cref="TrainingUxController"/> — shows
-    /// the step form, places the label + connector on the step's detected class
-    /// via capture-pose unprojection, and keeps the hand menu's current-step
-    /// readout fresh. Pressing an action builds the step's
-    /// <see cref="TrainingStepResult"/> and feeds it back to the state service,
-    /// which routes it down the detections path.
+    /// training state flow and drives the com.ethar.uxtraining package's
+    /// <see cref="TrainingUxController"/> — maps each step activation onto the
+    /// package's presentation-only <see cref="TrainingStepView"/>, places the
+    /// label + connector on the step's detected class via capture-pose
+    /// unprojection, and keeps the hand menu's current-step readout fresh.
+    /// Pressing an action builds the step's <see cref="TrainingStepResult"/> and
+    /// feeds it back to the state service, which routes it down the detections
+    /// path.
     /// </summary>
     [System.Runtime.InteropServices.Guid("7c2f4d15-6f38-4a02-9df0-58b6f6f0a9b2")]
     public sealed class TrainingPresentationService : BaseServiceWithConstructor, ITrainingPresentationService
@@ -94,7 +97,8 @@ namespace QuestVisionStream.Client
                     hint = () => controller.PulseWorldLabel(),
                     redo = RestartScenario,
                     exit = ExitScenario
-                });
+                },
+                brand: "ETHAR TRAINING");
             // The state service starts first (lower priority) — its ScenarioLoaded
             // fired before this subscription, so read the loaded scenario directly.
             controller.SetHandMenuStep("TRAINING", training.Scenario != null ? training.Scenario.Name : "Waiting…");
@@ -200,7 +204,7 @@ namespace QuestVisionStream.Client
 
         private void OnStepActivated(TrainingStepActivation activation)
         {
-            controller.ShowStep(activation);
+            controller.ShowStep(ToView(activation));
             controller.SetHandMenuStep(
                 $"STEP {activation.StepIndex + 1}/{activation.StepCount}",
                 activation.Step.HasPresentation ? activation.Step.Title : "…");
@@ -256,6 +260,19 @@ namespace QuestVisionStream.Client
             controller.HideWorldLabel();
             training.ResetScenario();
             controller.SetHandMenuStep("TRAINING", "Exited — HOME restarts");
+        }
+
+        /// <summary>Map a state-service step activation onto the package's presentation-only view.</summary>
+        private static TrainingStepView ToView(TrainingStepActivation activation)
+        {
+            var step = activation.Step;
+            return new TrainingStepView(
+                activation.StepIndex,
+                activation.StepCount,
+                step.Title,
+                step.Description,
+                step.Options,
+                step.ImageRef);
         }
 
         private bool TryGetWorldPoint(TrainingDetectionMatch match, out Vector3 worldPoint)

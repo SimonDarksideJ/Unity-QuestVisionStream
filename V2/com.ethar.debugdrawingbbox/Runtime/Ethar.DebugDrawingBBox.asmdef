@@ -1,0 +1,21 @@
+{
+    "name": "Ethar.DebugDrawingBBox",
+    "rootNamespace": "Ethar.DebugDrawingBBox",
+    "references": [
+        "QuestVisionStream.Unity",
+        "RealityCollective.ServiceFramework",
+        "RealityCollective.Utilities",
+        "Unity.XR.ARFoundation",
+        "Unity.XR.ARSubsystems",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

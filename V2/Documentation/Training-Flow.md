@@ -66,7 +66,7 @@ class.
 
 ## The demo scenario (Training_Scenario.xlsx)
 
-Shipped as `Assets/XRTraining/Resources/EtharTrainingScenario.asset` (and as
+Shipped as `Assets/QuestVisionStream/Resources/EtharTrainingScenario.asset` (and as
 the built-in fallback `TrainingScenarioLibrary.EtharDemo()`):
 
 | # | Waits for | Form | Action → result | World label |
@@ -103,12 +103,16 @@ wants to move on. If a step must be detection-only, give it no options.)
 
 ### `ITrainingPresentationService` (interface in package, implementation in the client app)
 
-Receives UX requests from the state flow and owns the training UI
-(`TrainingPresentationService` + `TrainingUxController` in
-`Unity-Quest-Client/Assets/QuestVisionStream/Scripts/Training/`):
+Receives UX requests from the state flow and owns the training UI. The glue
+service (`TrainingPresentationService` in
+`Unity-Quest-Client/Assets/QuestVisionStream/Scripts/Training/`) maps each
+step activation onto a presentation-only `TrainingStepView` and drives the
+reusable **`com.ethar.uxtraining`** package (`V2/com.ethar.uxtraining/` —
+headset-agnostic, Unity Input System only), which owns `TrainingUxController`
+and the whole uGUI kit:
 
-- **Display menu** — a world-space step form built from the XRTraining uGUI kit
-  (`Assets/XRTraining/`): eyebrow step counter, progress ticks, title,
+- **Display menu** — a world-space step form built from the Ethar UX Training
+  uGUI kit: eyebrow step counter, progress ticks, title,
   description, the shared camera/grey-backdrop image placeholder, and the
   step's action buttons. Re-anchored ~1.25 m in front of the user per step.
 - **Hand menu** — the design's vertical 1d strip with a live current-step
@@ -130,13 +134,16 @@ Receives UX requests from the state flow and owns the training UI
   machine clears its cached detected class on every advance so stale
   re-sightings can never resurrect an old indicator.
 - **Interaction** — controller-only for now (hand tracking comes later). One
-  `ControllerUiPointer` owns the EventSystem: an `InputSystemUIInputModule`
-  configured in code with the right controller's OpenXR **aim pose** as a
+  `XRUiPointer` (package `com.ethar.uxtraining`, formerly the client's
+  `ControllerUiPointer`) owns the EventSystem: an `InputSystemUIInputModule`
+  configured in code with the pointing controller's OpenXR **aim pose** as a
   tracked pointer, **trigger** as select, and a laser beam so the user can see
-  what they're aiming at (no interaction-toolkit dependency; the Editor mouse
-  works through the same module). Every interactive world-space canvas — the
-  warm-up Enter card, the step form, the hand menu — registers a
-  `TrackedDeviceRaycaster` through `ControllerUiPointer.RegisterCanvas`.
+  what they're aiming at (no interaction-toolkit or vendor-SDK dependency —
+  generic Input System `<XRController>` bindings, so the same pointer runs on
+  Quest, Magic Leap 2 or any OpenXR headset; the Editor mouse works through
+  the same module). Every interactive world-space canvas — the warm-up Enter
+  card, the step form, the hand menu — registers a `TrackedDeviceRaycaster`
+  through `XRUiPointer.RegisterCanvas`.
   Selection is pointer-only: there are no hardware-button shortcuts. The beam
   is clamped to the UI raycast hit (it stops on what a click would land on)
   with a circular reticle laid flat on the surface, and every button carries
@@ -166,7 +173,7 @@ instant:
 Both services are registered code-first in `QuestVisionStreamBootstrap`
 (priorities 45/46) behind the `enableTraining` toggle, alongside a
 `trainingScenario` asset override and a theme index (Dark·Cyan / Light·Teal /
-Hi-Vis·Orange — the swappable XRTraining palettes).
+Hi-Vis·Orange — the swappable Ethar UX Training palettes).
 
 ## Authoring a new scenario
 
@@ -179,7 +186,7 @@ Hi-Vis·Orange — the swappable XRTraining palettes).
    use any unique token (`begintraining`, `foundtv`, …) for steps advanced by
    an action press.
 3. Assign the asset to **Bootstrap ▸ Training Scenario** (or replace
-   `Assets/XRTraining/Resources/EtharTrainingScenario.asset`).
+   `Assets/QuestVisionStream/Resources/EtharTrainingScenario.asset`).
 
 The inspector's **Import JSON… / Export JSON…** buttons round-trip the wire
 format (`TrainingScenarioParser`); an asset with no steps is rejected at load

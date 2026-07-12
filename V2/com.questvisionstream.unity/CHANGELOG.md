@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+- **Breaking: training state machine extracted to `com.ethar.trainingstatemachine`**.
+  `TrainingStateMachine`, `TrainingScenario`/`TrainingStep`,
+  `TrainingScenarioParser`, `TrainingScenarioLibrary`, `TrainingStepResult`,
+  `TrainingAdvance` and the training enums moved out of this package
+  (namespace `QuestVisionStream.Training` → `Ethar.Training`), rebuilt on basic
+  C# types only (`noEngineReferences`) so the component can be ported to other
+  runtimes (see the companion standalone Python port,
+  `com.ethar.trainingstatemachine.python`). The machine is now initialized from
+  a serializable `TrainingStateMachineConfig` struct;
+  `TrainingStateServiceProfile` (ScriptableObject) is retained and converted to
+  the struct via `ToConfig()` for service initialization, and per-class
+  processing (confidence gate, sighting, expected-class check) is delegated to
+  the machine's `ProcessClass`. `TrainingScenarioAsset` and the protocol-side
+  `TrainingResponseMessage` stay in this package; the machine/parser EditMode
+  tests moved to the new package alongside new valid/ignore/result-processing
+  coverage.
+
+- **Breaking: detection rendering extracted to `com.ethar.debugdrawingbbox`**.
+  `IDetectionRendererService`/`IDetectionRenderModule`, `DetectionRendererService`,
+  `EphemeralBoxRenderModule` and `UnlitMaterialFactory` moved out of this
+  package (namespace `QuestVisionStream.Services`/`QuestVisionStream.Core` →
+  `Ethar.DebugDrawingBBox`), joining the app-side `AnchoredTagRenderModule`,
+  `EnvironmentDepthProvider` and the drawing test harness/editor tools in the
+  new package. This package still validates payloads and produces normalized
+  `RenderBatch`es; drawing them is now the companion package's job.
+
 - **Training scenarios are now ScriptableObject assets**:
   `TrainingScenarioAsset` (Create → QuestVisionStream → Training Scenario) with
   a custom inspector in the new `QuestVisionStream.Unity.Editor` assembly —

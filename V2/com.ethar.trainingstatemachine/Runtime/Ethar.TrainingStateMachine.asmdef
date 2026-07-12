@@ -1,0 +1,14 @@
+{
+    "name": "Ethar.TrainingStateMachine",
+    "rootNamespace": "Ethar.Training",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

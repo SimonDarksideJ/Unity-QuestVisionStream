@@ -1,0 +1,28 @@
+{
+  "name": "com.ethar.debugdrawingbbox",
+  "displayName": "Ethar Debug Drawing (Bounding Boxes)",
+  "description": "World-space debug drawing for vision detection events: renders detection bounding boxes (outline, centre marker and confidence label) through the capture-time camera pose. Ships two switchable render modules — Ephemeral (pose-frozen outline boxes redrawn per payload, the default) and Anchored (persistent depth-anchored tags via Meta environment depth, scene-mesh raycast or fixed-distance fallback) — plus the URP/XR-safe unlit material factory and an editor drawing test harness.",
+  "version": "1.0.0-pre.1",
+  "unity": "6000.0",
+  "documentationUrl": "https://github.com/SimonDarksideJ/Unity-QuestVisionStream/tree/QuestV2/V2/Documentation",
+  "license": "MIT",
+  "author": {
+    "name": "Simon Jackson (SimonDarksideJ)",
+    "url": "https://github.com/SimonDarksideJ"
+  },
+  "keywords": [
+    "debug-drawing",
+    "bounding-box",
+    "detection",
+    "computer-vision",
+    "xr",
+    "ethar"
+  ],
+  "dependencies": {
+    "com.questvisionstream.unity": "1.0.0-pre.1",
+    "com.realitycollective.service-framework": "2.0.0-pre.1",
+    "com.realitycollective.utilities": "2.0.0-pre.1",
+    "com.unity.xr.arfoundation": "6.5.0",
+    "com.unity.ugui": "2.0.0"
+  }
+}

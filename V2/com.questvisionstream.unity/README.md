@@ -22,7 +22,7 @@ detection renderers and tag detector backends are all swappable modules.
 | `IWebRTCService` (20) | Session orchestration, frame pump, renegotiation | `IWebRTCTransportModule` (`AndroidWebRTCTransportModule`) |
 | `IPoseTrackingService` (25) | Pose history + pts latency estimation (pose-freeze) | — |
 | `IDetectionService` (30) | Payload validation/parse → normalized batches | — |
-| `IDetectionRendererService` (35) | One active render module; recenter cleanup | `IDetectionRenderModule` (`EphemeralBoxRenderModule`; app adds `AnchoredTagRenderModule`) |
+| `IDetectionRendererService` (35) *(in `com.ethar.debugdrawingbbox`)* | One active render module; recenter cleanup | `IDetectionRenderModule` (`EphemeralBoxRenderModule`, `AnchoredTagRenderModule` — both in `com.ethar.debugdrawingbbox`) |
 | `ITagDetectionService` (40) | Throttled on-device tag decode | `ITagDetectorModule` (`KeijiroAprilTagDetectorModule`, tagStandard41h12) |
 | `ITagRoutingService` (41) | enter/update/exit lifecycle + rules engine | — |
 | `ITagPlacementService` (42) | Coloured world-space tag markers | — |

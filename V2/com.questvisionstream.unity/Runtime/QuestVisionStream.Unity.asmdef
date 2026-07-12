@@ -2,6 +2,7 @@
     "name": "QuestVisionStream.Unity",
     "rootNamespace": "QuestVisionStream",
     "references": [
+        "Ethar.TrainingStateMachine",
         "RealityCollective.ServiceFramework",
         "RealityCollective.Utilities",
         "Utilities.WebSockets"

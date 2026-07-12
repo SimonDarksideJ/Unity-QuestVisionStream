@@ -1,0 +1,23 @@
+{
+  "name": "com.ethar.trainingstatemachine",
+  "displayName": "Ethar Training State Machine",
+  "description": "Engine-agnostic training flow state machine: a queue of expected semantic classes driven by detection events. Configured from a plain serializable struct, uses only basic C# types (no UnityEngine dependencies), and is designed for 1:1 ports to other runtimes (see the companion Python implementation).",
+  "version": "1.0.0",
+  "unity": "6000.0",
+  "documentationUrl": "https://github.com/SimonDarksideJ/Unity-QuestVisionStream/tree/QuestV2/V2/Documentation",
+  "license": "MIT",
+  "author": {
+    "name": "Simon Jackson (SimonDarksideJ)",
+    "url": "https://github.com/SimonDarksideJ"
+  },
+  "keywords": [
+    "training",
+    "state-machine",
+    "computer-vision",
+    "detection",
+    "ethar"
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
+}

@@ -3,6 +3,7 @@
     "rootNamespace": "QuestVisionStream.Tests",
     "references": [
         "QuestVisionStream.Unity",
+        "Ethar.TrainingStateMachine",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

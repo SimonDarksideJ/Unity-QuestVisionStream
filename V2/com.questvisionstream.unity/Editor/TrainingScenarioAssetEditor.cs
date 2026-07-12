@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Ethar.Training;
 using QuestVisionStream.Training;
 using UnityEditor;
 using UnityEngine;

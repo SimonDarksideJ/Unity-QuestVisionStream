@@ -1,0 +1,26 @@
+{
+  "name": "com.ethar.uxtraining",
+  "displayName": "Ethar UX Training",
+  "description": "Headset-agnostic XR training UX kit: themed, runtime-built uGUI (world-space step forms, palm-up hand menu, world labels with leader-line connectors), pointer interaction and UX feedback built purely on the Unity Input System with generic <XRController> bindings — Meta Quest, Magic Leap 2 or any OpenXR headset. Drive it from any detection or state source via TrainingStepView.",
+  "version": "1.0.0-pre.1",
+  "unity": "6000.0",
+  "documentationUrl": "https://github.com/SimonDarksideJ/Unity-QuestVisionStream/tree/QuestV2/V2/Documentation",
+  "license": "MIT",
+  "author": {
+    "name": "Simon Jackson (SimonDarksideJ)",
+    "url": "https://github.com/SimonDarksideJ"
+  },
+  "keywords": [
+    "xr",
+    "training",
+    "ux",
+    "ugui",
+    "input-system",
+    "hand-menu",
+    "openxr"
+  ],
+  "dependencies": {
+    "com.unity.inputsystem": "1.19.0",
+    "com.unity.ugui": "2.0.0"
+  }
+}

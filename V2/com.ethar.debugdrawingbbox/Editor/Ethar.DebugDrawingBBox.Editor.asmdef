@@ -1,0 +1,18 @@
+{
+    "name": "Ethar.DebugDrawingBBox.Editor",
+    "rootNamespace": "Ethar.DebugDrawingBBox.Editor",
+    "references": [
+        "Ethar.DebugDrawingBBox"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

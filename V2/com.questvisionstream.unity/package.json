@@ -1,7 +1,7 @@
 {
   "name": "com.questvisionstream.unity",
   "displayName": "Quest Vision Stream (Unity)",
-  "description": "Reusable Unity client library for QuestVisionStream V2: streams the Quest passthrough camera to the QuestVisionStreamServer over WebRTC and renders the returned detections. Built as RealityCollective Service Framework services with swappable service modules (WebRTC transport, camera capture, image qualifiers, detection renderers, tag detectors).",
+  "description": "Reusable Unity client library for QuestVisionStream V2: streams the Quest passthrough camera to the QuestVisionStreamServer over WebRTC and surfaces the returned detections (world-space bounding-box rendering lives in the companion com.ethar.debugdrawingbbox package). Built as RealityCollective Service Framework services with swappable service modules (WebRTC transport, camera capture, image qualifiers, tag detectors).",
   "version": "1.0.0-pre.1",
   "unity": "6000.0",
   "documentationUrl": "https://github.com/SimonDarksideJ/Unity-QuestVisionStream/tree/QuestV2/V2/Documentation",
@@ -19,6 +19,7 @@
     "service-framework"
   ],
   "dependencies": {
+    "com.ethar.trainingstatemachine": "1.0.0",
     "com.realitycollective.service-framework": "2.0.0-pre.1",
     "com.realitycollective.utilities": "2.0.0-pre.1",
     "com.utilities.websockets": "2.0.0",

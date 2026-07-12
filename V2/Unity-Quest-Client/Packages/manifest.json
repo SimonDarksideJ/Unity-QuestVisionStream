@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "com.ethar.debugdrawingbbox": "file:../../com.ethar.debugdrawingbbox",
+    "com.ethar.trainingstatemachine": "file:../../com.ethar.trainingstatemachine",
+    "com.ethar.uxtraining": "file:../../com.ethar.uxtraining",
     "com.meta.xr.sdk.core": "203.0.0",
     "com.questvisionstream.unity": "file:../../com.questvisionstream.unity",
     "com.realitycollective.service-framework": "2.0.0-pre.1",

@@ -1,6 +1,7 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
+using Ethar.DebugDrawingBBox;
 using QuestVisionStream.Core;
 using QuestVisionStream.Services;
 using UnityEngine;

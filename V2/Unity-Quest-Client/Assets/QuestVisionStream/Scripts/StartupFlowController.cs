@@ -1,6 +1,7 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
+using Ethar.UXTraining.Interaction;
 using QuestVisionStream.Protocol;
 using QuestVisionStream.Services;
 using UnityEngine;
@@ -22,10 +23,11 @@ namespace QuestVisionStream.Client
     ///     connected", and the VPN/server failure hint.
     ///   - Card hides once the streaming session starts.
     ///
-    /// Activation is the controller laser: point at the button and pull the
-    /// trigger (acts ONLY while the button is enabled — same contract as a
-    /// disabled DOM button). Status/diagnostics live in the detection HUD log
-    /// window — this card renders no free-floating debug text.
+    /// Activation is the controller laser (com.ethar.uxtraining's
+    /// <see cref="XRUiPointer"/>): point at the button and pull the trigger
+    /// (acts ONLY while the button is enabled — same contract as a disabled DOM
+    /// button). Status/diagnostics live in the detection HUD log window — this
+    /// card renders no free-floating debug text.
     /// </summary>
     [AddComponentMenu("")]
     public sealed class StartupFlowController : MonoBehaviour
@@ -264,8 +266,8 @@ namespace QuestVisionStream.Client
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.worldCamera = Camera.main;
             // Point-and-click on the Enter button with the controller laser.
-            ControllerUiPointer.EnsureSetup();
-            ControllerUiPointer.RegisterCanvas(introRoot);
+            XRUiPointer.EnsureSetup();
+            XRUiPointer.RegisterCanvas(introRoot);
             var canvasRect = (RectTransform)introRoot.transform;
             canvasRect.sizeDelta = new Vector2(620, 400);
             introRoot.transform.localScale = Vector3.one * 0.0012f;
@@ -295,7 +297,7 @@ namespace QuestVisionStream.Client
             tint.colorMultiplier = 1f;
             buttonControl.colors = tint;
 
-            XRTraining.Components.ButtonHoverGlow.Attach(buttonObject.gameObject, ButtonEnabledColor, radius: 10);
+            Ethar.UXTraining.Components.ButtonHoverGlow.Attach(buttonObject.gameObject, ButtonEnabledColor, radius: 10);
 
             var label = CreateText((RectTransform)buttonObject.transform, "Label", "Checking camera…", 24, FontStyle.Bold, ButtonDisabledText);
             Stretch(label, Vector2.zero, Vector2.zero);

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ethar.Training;
 using UnityEngine;
 
 namespace QuestVisionStream.Training
@@ -85,6 +86,12 @@ namespace QuestVisionStream.Training
         /// <summary>Snapshot into the immutable runtime scenario the state machine consumes.</summary>
         public TrainingScenario ToScenario() => new TrainingScenario(
             scenarioName, steps.Select(step => step.ToStep()).ToArray());
+
+        /// <summary>
+        /// Snapshot into the serializable configuration struct — the plain-data
+        /// form handed to the state machine for service initialization.
+        /// </summary>
+        public TrainingScenarioData ToScenarioData() => TrainingScenarioData.FromScenario(ToScenario());
 
         /// <summary>Replace this asset's content from a runtime scenario (JSON import).</summary>
         public void FromScenario(TrainingScenario scenario)
