@@ -219,27 +219,45 @@ Hi-Vis·Orange — the swappable Ethar UX Training palettes).
 
 ## Authoring a new scenario
 
+**Visual route (recommended):** draw the flow as a mermaid diagram and
+convert it with the **training builder**
+([Training-Builder.md](Training-Builder.md)) — `builder.py md2json flow.md -o
+scenario.json` (or start from a spreadsheet with `csv2md`/`csv2json`), review
+the validation report, then **Import JSON…** on the asset below.
+
+**In-inspector route:**
+
 1. **Create → QuestVisionStream → Training Scenario** and edit the queue in the
    inspector — keep the chain rule: *each step's `result` is a later step's
    `waitingClass`*, and the final step's `result` empty. The inspector
-   validates the chain live (unreachable steps, dead-end results, early
-   completion) and shows the expected-class queue.
-2. Use detector class names (`tv`, `person`, …) for steps advanced by vision;
-   use any unique token (`begintraining`, `foundtv`, …) for steps advanced by
-   an action press.
+   validates the chain live via the shared `TrainingScenarioValidator`
+   (unreachable steps, dead-end results, early completion) and shows the
+   expected-class queue — the same report the builder CLI prints.
+2. Use detector class names (`tv`, `person`, …) — or AprilTag registry class
+   names — for steps advanced by vision; use any unique token
+   (`begintraining`, `foundtv`, …) for steps advanced by an action press.
+   Give a step a `modelRef` to spawn its catalog model aligned to the step's
+   tag.
 3. Assign the asset to **Bootstrap ▸ Training Scenario** (or replace
    `Assets/QuestVisionStream/Resources/EtharTrainingScenario.asset`).
 
 The inspector's **Import JSON… / Export JSON…** buttons round-trip the wire
-format (`TrainingScenarioParser`); an asset with no steps is rejected at load
-and the built-in demo is the last-resort fallback.
+format (`TrainingScenarioParser`) — JSON is the interchange with the builder
+(`json2md` turns an exported asset back into a reviewable diagram); an asset
+with no steps is rejected at load and the built-in demo is the last-resort
+fallback.
 
 ## Tests
 
-`com.questvisionstream.unity/Tests/Editor/`:
-
-- `TrainingScenarioTests` — JSON parsing, queue chain rule, round-trip,
-  malformed-input rejection, demo-vs-Excel fidelity.
-- `TrainingStateMachineTests` — the full Excel flow end to end, discard
-  behaviour, case-insensitivity, reset/restart, and the synthetic
+- `com.ethar.trainingstatemachine/Tests/Editor/` — the core suite
+  (`TrainingScenarioParserTests`, `TrainingStateMachineTests`,
+  `TrainingProcessingTests`, `TrainingValidatorTests`): parsing/round-trip,
+  the full demo flow, discard behaviour, case-insensitivity, reset/restart,
+  and the chain validator. Runs in the Unity Test Runner **or** headless via
+  `dotnet test Tests~` (no Unity required).
+- `com.questvisionstream.unity/Tests/Editor/` — the wire-protocol bridges
+  (`TrainingResponseMessageTests`, `TagDetectionMessageTests`) and the
+  authoring asset (`TrainingScenarioAssetTests`), including the synthetic
   response-as-detection path through the real channel parser.
+- `com.ethar.trainingstatemachine.python/tests/` — the Python export's
+  mirror suite plus the builder tests (`python -m unittest discover`).
