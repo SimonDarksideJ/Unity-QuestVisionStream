@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Missing `Unity.XR.CoreUtils` asmdef reference (+ explicit
+  `com.unity.xr.core-utils` package dependency): `EnvironmentDepthProvider`'s
+  occlusion-frame accessors (`TryGetPoses`/`TryGetFovs`/`TryGetNearFarPlanes`)
+  return `ReadOnlyList<>` from CoreUtils, which compiled only while the type
+  happened to resolve transitively — a clean recompile failed with CS0012 and
+  cascading errors.
+
 ### Added
 
 - `IDetectionRendererService.RenderingEnabled` — master visibility switch for

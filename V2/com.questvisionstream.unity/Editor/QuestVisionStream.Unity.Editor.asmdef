@@ -2,7 +2,8 @@
     "name": "QuestVisionStream.Unity.Editor",
     "rootNamespace": "QuestVisionStream.Editor",
     "references": [
-        "QuestVisionStream.Unity"
+        "QuestVisionStream.Unity",
+        "Ethar.TrainingStateMachine"
     ],
     "includePlatforms": [
         "Editor"
