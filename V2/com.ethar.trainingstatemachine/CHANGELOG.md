@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `com.ethar.trainingstatemachine.python` (`builder.py` CLI), with scenario
   JSON as the interchange this package parses — see
   `Documentation/Training-Builder.md`.
+- **`Tests~/` headless test runner** — a ~30-line csproj (no logic) that
+  compiles Runtime + EditMode test sources and runs the full NUnit suite via
+  `dotnet test Tests~`, so the package verifies without Unity (CI-ready).
+  The `~` folder is invisible to the Unity importer.
 
 - `TrainingStep.ModelRef` (+ `HasModel`, wire key `modelRef`, additive and
   optional): a host-resolved model catalog key spawned aligned to the step's

@@ -30,6 +30,19 @@ standalone Python implementation lives alongside this package in
 > is the interchange this package parses). See
 > `V2/Documentation/Training-Builder.md`.
 
+## Headless tests (no Unity required)
+
+The EditMode tests are pure NUnit and the runtime has no engine references,
+so the whole suite also runs from the terminal / CI with the .NET SDK (8+):
+
+```bash
+dotnet test Tests~
+```
+
+`Tests~/` holds only the ~30-line runner csproj (verification infrastructure,
+no logic); the `~` suffix hides it from the Unity importer. In Unity, the same
+tests run normally via the Test Runner.
+
 ## Usage
 
 ```csharp
