@@ -8,6 +8,12 @@ beyond the Python 3.8+ standard library. The API mirrors the C# implementation
 `APRIL_TAG` class source, and the built-in Ethar demo scenario), so behaviour
 is identical across both runtimes.
 
+> This package is a standalone **export for server-side Python use** — it is
+> not referenced by the Unity project in any way. 📖 The unified wire-format
+> and capability reference for both implementations is
+> [`V2/Documentation/Training-Configuration-Reference.md`](../Documentation/Training-Configuration-Reference.md);
+> changes must land in both packages and that document together (parity policy).
+
 ## Layout
 
 ```

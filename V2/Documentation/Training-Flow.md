@@ -1,5 +1,10 @@
 # Training Flow — State Service + Presentation Service
 
+> 📖 The canonical scenario **wire format and capability reference** (aligned
+> against both the C# package and its standalone Python export) is
+> [Training-Configuration-Reference.md](Training-Configuration-Reference.md).
+> This document covers the Unity client's end-to-end flow and UX.
+
 The authoritative training flow for the Quest client: a **Training State
 Service** that manages a queue of expected detection classes, and a **Training
 Presentation Service** that turns each activated step into UX — a display-menu

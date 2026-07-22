@@ -60,6 +60,10 @@ their own events (e.g. attach detection geometry) without re-deriving state.
 
 ## Scenario JSON wire format
 
+> 📖 The full field-by-field schema and capability reference, aligned against
+> both this package and the standalone Python export, is
+> [`V2/Documentation/Training-Configuration-Reference.md`](../Documentation/Training-Configuration-Reference.md).
+
 ```json
 {
   "name": "Ethar Training Demo",
