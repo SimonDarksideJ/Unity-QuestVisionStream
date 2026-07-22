@@ -101,6 +101,7 @@ def _read_scenario(root: dict) -> Tuple[bool, Optional[TrainingScenario]]:
             label=_string(item.get("label")),
             image_ref=_string(item.get("imageRef")),
             result=_string(item.get("result")),
+            model_ref=_string(item.get("modelRef")),
         ))
 
     return True, TrainingScenario(name=_string(root.get("name")), steps=tuple(steps))
@@ -119,6 +120,7 @@ def _write_scenario(scenario: TrainingScenario) -> dict:
                 "label": step.label,
                 "imageRef": step.image_ref,
                 "result": step.result,
+                "modelRef": step.model_ref,
             }
             for step in scenario.steps
         ],

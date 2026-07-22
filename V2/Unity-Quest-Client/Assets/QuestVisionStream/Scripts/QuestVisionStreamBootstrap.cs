@@ -1,6 +1,7 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
+using System.Collections.Generic;
 using Ethar.DebugDrawingBBox;
 using QuestVisionStream.Core;
 using QuestVisionStream.Services;
@@ -92,6 +93,10 @@ namespace QuestVisionStream.Client
         [Tooltip("Built-in Ethar UX Training palette for the training UX: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
         private int trainingThemeIndex = 0;
 
+        [SerializeField]
+        [Tooltip("Model catalog for training steps: maps a step's Model Ref key to the prefab spawned aligned to the step's AprilTag when the step activates.")]
+        private List<TrainingModelEntry> trainingModels = new List<TrainingModelEntry>();
+
         [Header("AprilTags")]
         [SerializeField]
         private bool enableAprilTags = true;
@@ -99,6 +104,10 @@ namespace QuestVisionStream.Client
         [SerializeField]
         [Tooltip("Physical printed tag width in meters (tagStandard41h12 sheets from V2/tools/generate-apriltags.py).")]
         private float tagSizeMeters = 0.1f;
+
+        [SerializeField]
+        [Tooltip("Republish tag sightings into the detection pipeline as ClassName detections (label = registry Class Name), so AprilTags render, log and drive the training flow exactly like server detections — including fully offline.")]
+        private bool bridgeTagsToDetections = true;
 
         private const float PitchTuneRateDegreesPerSecond = 20f;
 
@@ -497,6 +506,27 @@ namespace QuestVisionStream.Client
                 placementProfile.TagSizeMeters = tagSizeMeters;
                 serviceManager.TryCreateAndRegisterService<ITagPlacementService>(
                     typeof(TagPlacementService), out _, "Tag Placement", 42u, placementProfile);
+
+                // Tag → detection bridge (43): republish sightings into the
+                // detection pipeline as ClassName detections. Tags detect, the
+                // bridge translates, the training engine decides.
+                if (bridgeTagsToDetections)
+                {
+                    var bridgeProfile = ScriptableObject.CreateInstance<TagDetectionBridgeServiceProfile>();
+                    serviceManager.TryCreateAndRegisterService<ITagDetectionBridgeService>(
+                        typeof(TagDetectionBridgeService), out _, "Tag Detection Bridge", 43u, bridgeProfile);
+                }
+
+                // Training model placement (47): steps carrying a Model Ref spawn
+                // their catalog prefab aligned to the step's tag (registered after
+                // both the tag and training services it consumes).
+                if (enableTraining)
+                {
+                    var modelProfile = ScriptableObject.CreateInstance<TrainingModelPlacementServiceProfile>();
+                    modelProfile.Catalog = trainingModels;
+                    serviceManager.TryCreateAndRegisterService<ITrainingModelPlacementService>(
+                        typeof(TrainingModelPlacementService), out _, "Training Model Placement", 47u, modelProfile);
+                }
             }
 
             // --- Status (50) ---

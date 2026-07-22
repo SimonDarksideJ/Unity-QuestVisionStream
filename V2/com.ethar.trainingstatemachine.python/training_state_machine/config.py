@@ -20,6 +20,7 @@ class TrainingStepData:
     label: str = ""
     image_ref: str = ""
     result: str = ""
+    model_ref: str = ""
 
     def to_step(self) -> TrainingStep:
         """Build the immutable runtime step (None fields default to empty)."""
@@ -32,6 +33,7 @@ class TrainingStepData:
             label=self.label or "",
             image_ref=self.image_ref or "",
             result=self.result or "",
+            model_ref=self.model_ref or "",
         )
 
     @staticmethod
@@ -46,6 +48,7 @@ class TrainingStepData:
             label=step.label,
             image_ref=step.image_ref,
             result=step.result,
+            model_ref=step.model_ref,
         )
 
 

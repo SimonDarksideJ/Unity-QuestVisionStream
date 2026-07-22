@@ -4,6 +4,19 @@ All notable changes to this package are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- `TrainingStep.ModelRef` (+ `HasModel`, wire key `modelRef`, additive and
+  optional): a host-resolved model catalog key spawned aligned to the step's
+  physical marker (e.g. AprilTag) by the host's placement layer. Carried
+  through `TrainingStepData`, the parser and the authoring mirrors.
+- `TrainingClassSource.AprilTag`: on-device fiducial sightings bridged into
+  the class pipeline. Deterministic — never gated by
+  `MinimumDetectionConfidence`.
+- Mirrored 1:1 in the Python port (`model_ref`, `has_model`, `APRIL_TAG`).
+
 ## [1.0.0] - 2026-07-12
 
 ### Added

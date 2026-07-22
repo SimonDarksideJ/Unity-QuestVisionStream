@@ -42,8 +42,12 @@ namespace QuestVisionStream.Services
 
         public TrainingClassSource Source { get; }
 
-        /// <summary>True when this match came from a real server detection (has a placeable world point).</summary>
-        public bool HasWorldPoint => Source == TrainingClassSource.Detection && ArrivalTimeMs >= 0;
+        /// <summary>
+        /// True when this match carries placeable geometry — a real server
+        /// detection or a bridged AprilTag sighting (whose box is authored at
+        /// publish time against the live view). Synthetic action responses don't.
+        /// </summary>
+        public bool HasWorldPoint => Source != TrainingClassSource.ActionResponse && ArrivalTimeMs >= 0;
     }
 
     /// <summary>A step became active — the payload handed to the presentation layer.</summary>

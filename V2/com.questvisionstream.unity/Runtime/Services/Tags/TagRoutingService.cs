@@ -139,6 +139,7 @@ namespace QuestVisionStream.Services
                     {
                         Id = sighting.Id,
                         TagName = info.Name,
+                        ClassName = info.EffectiveClassName,
                         Color = info.Color,
                         WorldPose = sighting.WorldPose,
                         FirstSeenMs = timeMs,

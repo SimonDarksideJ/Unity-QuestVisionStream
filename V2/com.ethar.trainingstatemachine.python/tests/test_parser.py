@@ -80,6 +80,23 @@ class TrainingScenarioParserTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(reparsed, original, "frozen dataclasses compare by value")
 
+    def test_parse_model_ref_round_trips_and_defaults_empty(self):
+        json_text = """{"steps":[
+            { "waitingClass": "", "title": "Station 1", "options": ["Go"], "detectedClass": "station1", "label": "Station 1", "modelRef": "pumpAssembly", "result": "station1" },
+            { "waitingClass": "station1", "result": "" }
+        ]}"""
+
+        ok, scenario = try_parse_scenario(json_text)
+        self.assertTrue(ok)
+        self.assertEqual(scenario.steps[0].model_ref, "pumpAssembly")
+        self.assertTrue(scenario.steps[0].has_model)
+        self.assertEqual(scenario.steps[1].model_ref, "", "missing modelRef defaults to empty")
+        self.assertFalse(scenario.steps[1].has_model)
+
+        ok, reparsed = try_parse_scenario(scenario_to_json(scenario))
+        self.assertTrue(ok)
+        self.assertEqual(reparsed, scenario, "modelRef survives the round trip")
+
     def test_config_to_json_round_trips_the_config(self):
         config = ethar_demo_config(0.65)
 

@@ -95,6 +95,29 @@ namespace Ethar.Training.Tests
         }
 
         [Test]
+        public void Parse_ModelRef_RoundTripsAndDefaultsEmpty()
+        {
+            var json = @"{""steps"":[
+                { ""waitingClass"": """", ""title"": ""Station 1"", ""options"": [""Go""], ""detectedClass"": ""station1"", ""label"": ""Station 1"", ""modelRef"": ""pumpAssembly"", ""result"": ""station1"" },
+                { ""waitingClass"": ""station1"", ""result"": """" }
+            ]}";
+
+            Assert.That(TrainingScenarioParser.TryParse(json, out var scenario), Is.True);
+            Assert.That(scenario.Steps[0].ModelRef, Is.EqualTo("pumpAssembly"));
+            Assert.That(scenario.Steps[0].HasModel, Is.True);
+            Assert.That(scenario.Steps[1].ModelRef, Is.Empty, "missing modelRef defaults to empty");
+            Assert.That(scenario.Steps[1].HasModel, Is.False);
+
+            Assert.That(TrainingScenarioParser.TryParse(TrainingScenarioParser.ToJson(scenario), out var reparsed), Is.True);
+            Assert.That(reparsed.Steps[0].ModelRef, Is.EqualTo("pumpAssembly"), "modelRef survives the round trip");
+
+            // And the serializable data mirror carries it both ways.
+            var data = TrainingScenarioData.FromScenario(scenario);
+            Assert.That(data.Steps[0].ModelRef, Is.EqualTo("pumpAssembly"));
+            Assert.That(data.ToScenario().Steps[0].ModelRef, Is.EqualTo("pumpAssembly"));
+        }
+
+        [Test]
         public void ConfigToJson_RoundTripsTheSerializableConfigStruct()
         {
             var config = TrainingScenarioLibrary.EtharDemoConfig(0.65f);

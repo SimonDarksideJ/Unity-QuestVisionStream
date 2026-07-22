@@ -22,12 +22,13 @@ namespace Ethar.Training
         public string Label;
         public string ImageRef;
         public string Result;
+        public string ModelRef;
 
         /// <summary>Build the immutable runtime step (null fields default to empty).</summary>
         public TrainingStep ToStep() => new TrainingStep(
             WaitingClass, Title, Description,
             Options ?? Array.Empty<string>(),
-            DetectedClass, Label, ImageRef, Result);
+            DetectedClass, Label, ImageRef, Result, ModelRef);
 
         /// <summary>Snapshot a runtime step back into plain data (options copied).</summary>
         public static TrainingStepData FromStep(TrainingStep step)
@@ -46,7 +47,8 @@ namespace Ethar.Training
                 DetectedClass = step.DetectedClass,
                 Label = step.Label,
                 ImageRef = step.ImageRef,
-                Result = step.Result
+                Result = step.Result,
+                ModelRef = step.ModelRef
             };
         }
     }

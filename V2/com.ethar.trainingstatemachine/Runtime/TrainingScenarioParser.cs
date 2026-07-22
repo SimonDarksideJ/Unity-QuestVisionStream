@@ -127,7 +127,8 @@ namespace Ethar.Training
                     step.Value<string>("detectedClass"),
                     step.Value<string>("label"),
                     step.Value<string>("imageRef"),
-                    step.Value<string>("result")));
+                    step.Value<string>("result"),
+                    step.Value<string>("modelRef")));
             }
 
             scenario = new TrainingScenario(root.Value<string>("name"), steps);
@@ -154,7 +155,8 @@ namespace Ethar.Training
                     ["detectedClass"] = step.DetectedClass,
                     ["label"] = step.Label,
                     ["imageRef"] = step.ImageRef,
-                    ["result"] = step.Result
+                    ["result"] = step.Result,
+                    ["modelRef"] = step.ModelRef
                 });
             }
 

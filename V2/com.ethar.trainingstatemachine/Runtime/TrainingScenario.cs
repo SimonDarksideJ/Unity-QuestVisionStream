@@ -25,7 +25,8 @@ namespace Ethar.Training
             string detectedClass,
             string label,
             string imageRef,
-            string result)
+            string result,
+            string modelRef = "")
         {
             WaitingClass = waitingClass ?? string.Empty;
             Title = title ?? string.Empty;
@@ -35,6 +36,7 @@ namespace Ethar.Training
             Label = label ?? string.Empty;
             ImageRef = imageRef ?? string.Empty;
             Result = result ?? string.Empty;
+            ModelRef = modelRef ?? string.Empty;
         }
 
         /// <summary>The class whose arrival activates this step. Empty on the entry step (activated by Begin).</summary>
@@ -65,11 +67,23 @@ namespace Ethar.Training
         /// </summary>
         public string Result { get; }
 
+        /// <summary>
+        /// Host-resolved model reference to instantiate while this step is active,
+        /// aligned to the physical marker (e.g. AprilTag) whose class name matches
+        /// <see cref="DetectedClass"/> (falling back to <see cref="WaitingClass"/>).
+        /// An opaque catalog key like <see cref="ImageRef"/> — the state machine
+        /// never interprets it; the host's placement layer does. Empty = no model.
+        /// </summary>
+        public string ModelRef { get; }
+
         /// <summary>False for pass-through steps (e.g. "foundtv") that advance without showing a form.</summary>
         public bool HasPresentation => Title.Length > 0 || Options.Count > 0;
 
         /// <summary>True when this step places a world label on a detection.</summary>
         public bool HasWorldLabel => DetectedClass.Length > 0 && Label.Length > 0;
+
+        /// <summary>True when this step asks the host to spawn a marker-aligned model.</summary>
+        public bool HasModel => ModelRef.Length > 0;
     }
 
     /// <summary>An ordered queue of <see cref="TrainingStep"/>s — one procedure at a time.</summary>

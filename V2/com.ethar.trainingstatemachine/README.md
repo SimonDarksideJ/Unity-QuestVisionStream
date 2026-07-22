@@ -66,10 +66,15 @@ their own events (e.g. attach detection geometry) without re-deriving state.
   "steps": [
     { "waitingClass": "", "title": "Welcome", "description": "…",
       "options": ["Begin"], "detectedClass": "", "label": "",
-      "imageRef": "camera", "result": "begintraining" }
+      "imageRef": "camera", "result": "begintraining", "modelRef": "" }
   ]
 }
 ```
+
+All step fields are optional and default to empty. `modelRef` is a
+host-resolved model catalog key: while the step is active, the host's
+placement layer spawns the mapped model aligned to the step's physical marker
+(e.g. AprilTag) — the machine itself never interprets it.
 
 A full machine config wraps a scenario:
 

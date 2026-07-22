@@ -30,6 +30,10 @@ IDetectionRendererService (35)── IDetectionRenderModule: EphemeralBoxRenderM
 ITagDetectionService (40)     ── ITagDetectorModule: KeijiroAprilTagDetectorModule (41h12)
 ITagRoutingService (41)       enter/update/exit + rules ("see X → do Y")
 ITagPlacementService (42)     coloured tag markers
+ITagDetectionBridgeService (43) tag sighting → ClassName detection (PublishLocal)
+ITrainingStateService (45)    training flow: queue of expected classes
+ITrainingPresentationService (46) step forms + hand menu + world label (app)
+ITrainingModelPlacementService (47) step modelRef → prefab aligned to its tag
 IStatusService (50)           status model → in-headset HUD + server uplink
 ```
 

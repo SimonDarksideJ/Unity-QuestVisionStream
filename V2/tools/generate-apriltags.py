@@ -73,7 +73,8 @@ def marker_bitmap_36h11(dictionary, tag_id: int, tag_px: int) -> np.ndarray:
     return cv2.aruco.generateImageMarker(dictionary, tag_id, tag_px)
 
 
-def render_tag(marker: np.ndarray, tag_id: int, name: str, family: str, quiet_frac: float):
+def render_tag(marker: np.ndarray, tag_id: int, name: str, family: str, quiet_frac: float,
+               class_name: str = ""):
     """A single tag: white quiet zone around the marker + a caption below."""
     tag_px = marker.shape[0]
     quiet_px = max(8, round(tag_px * quiet_frac))
@@ -82,7 +83,11 @@ def render_tag(marker: np.ndarray, tag_id: int, name: str, family: str, quiet_fr
     canvas = np.full((side + label_px, side), 255, np.uint8)
     canvas[quiet_px:quiet_px + tag_px, quiet_px:quiet_px + tag_px] = marker
 
-    text = f"#{tag_id}  {name}   ({FAMILY_LABELS[family]})"
+    # When the registry maps this tag to a detection class, print it — the
+    # headset registry (TagRegistryAsset.ClassName) and the printed sheet must
+    # tell the same story about what the tag stands for.
+    class_suffix = f"  [{class_name}]" if class_name and class_name != name else ""
+    text = f"#{tag_id}  {name}{class_suffix}   ({FAMILY_LABELS[family]})"
     font = cv2.FONT_HERSHEY_SIMPLEX
     scale = tag_px / 500.0
     thickness = max(1, round(scale * 2))
@@ -137,11 +142,12 @@ def main() -> int:
     print(f"Generating {len(tags)} AprilTag {FAMILY_LABELS[args.family]} markers → {out_dir}")
     for tag in tags:
         tid, name = int(tag["id"]), str(tag.get("name", f"Tag {tag['id']}"))
+        class_name = str(tag.get("className", ""))
         if args.family == "41h12":
             marker = marker_bitmap_41h12(tid, args.tag_px, args.apriltag_imgs)
         else:
             marker = marker_bitmap_36h11(dictionary, tid, args.tag_px - (args.tag_px % 8))
-        tile = render_tag(marker, tid, name, args.family, args.quiet)
+        tile = render_tag(marker, tid, name, args.family, args.quiet, class_name)
         tiles.append(tile)
         path = os.path.join(out_dir, f"tag_{tid:02d}_{name.lower()}.png")
         cv2.imwrite(path, tile)

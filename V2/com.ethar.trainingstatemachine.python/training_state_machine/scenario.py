@@ -42,6 +42,13 @@ class TrainingStep:
     #: step — pressing its action completes the scenario.
     result: str = ""
 
+    #: Host-resolved model reference to instantiate while this step is active,
+    #: aligned to the physical marker (e.g. AprilTag) whose class name matches
+    #: ``detected_class`` (falling back to ``waiting_class``). An opaque catalog
+    #: key like ``image_ref`` — the state machine never interprets it; the
+    #: host's placement layer does. Empty = no model.
+    model_ref: str = ""
+
     @property
     def has_presentation(self) -> bool:
         """False for pass-through steps (e.g. "foundtv") that advance without showing a form."""
@@ -51,6 +58,11 @@ class TrainingStep:
     def has_world_label(self) -> bool:
         """True when this step places a world label on a detection."""
         return len(self.detected_class) > 0 and len(self.label) > 0
+
+    @property
+    def has_model(self) -> bool:
+        """True when this step asks the host to spawn a marker-aligned model."""
+        return len(self.model_ref) > 0
 
 
 @dataclass(frozen=True)

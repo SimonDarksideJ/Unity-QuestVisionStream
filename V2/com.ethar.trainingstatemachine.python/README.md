@@ -3,9 +3,10 @@
 A standalone Python port of the `com.ethar.trainingstatemachine` Unity package —
 the same training flow state machine, no service framework, no dependencies
 beyond the Python 3.8+ standard library. The API mirrors the C# implementation
-1:1 (`TrainingStateMachine`, `TrainingStateMachineConfig`, the JSON wire format,
-and the built-in Ethar demo scenario), so behaviour is identical across both
-runtimes.
+1:1 (`TrainingStateMachine`, `TrainingStateMachineConfig`, the JSON wire format
+— including the optional per-step `modelRef` model catalog key — the
+`APRIL_TAG` class source, and the built-in Ethar demo scenario), so behaviour
+is identical across both runtimes.
 
 ## Layout
 
