@@ -13,6 +13,11 @@ class TrainingClassSource(Enum):
     #: The synthetic "detected class from pressing an action" on a training form.
     ACTION_RESPONSE = 1
 
+    #: An on-device fiducial sighting (e.g. AprilTag) bridged into the class
+    #: pipeline. Deterministic — always full confidence, never gated by
+    #: ``minimum_detection_confidence``.
+    APRIL_TAG = 2
+
 
 class TrainingFlowStatus(Enum):
     """Lifecycle of a loaded scenario."""

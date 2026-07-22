@@ -1,10 +1,7 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Ethar.Training;
 using QuestVisionStream.Training;
 using UnityEditor;
@@ -45,9 +42,13 @@ namespace QuestVisionStream.Editor
 
     /// <summary>
     /// Inspector for <see cref="TrainingScenarioAsset"/>: the editable step queue
-    /// plus live validation of the chain rule (every step's Result should be a
-    /// later step's Waiting Class) and JSON import/export through
-    /// <see cref="TrainingScenarioParser"/> for round-tripping with the wire format.
+    /// plus live chain validation via the shared core
+    /// <see cref="TrainingScenarioValidator"/> (the same checks the Python
+    /// builder CLI prints), and JSON import/export through
+    /// <see cref="TrainingScenarioParser"/>. JSON is the interchange format —
+    /// mermaid/CSV authoring happens in the Python training builder
+    /// (Documentation/Training-Builder.md) and round-trips through these
+    /// import/export buttons.
     /// </summary>
     [CustomEditor(typeof(TrainingScenarioAsset))]
     public sealed class TrainingScenarioAssetEditor : UnityEditor.Editor
@@ -62,9 +63,15 @@ namespace QuestVisionStream.Editor
             var asset = (TrainingScenarioAsset)target;
 
             EditorGUILayout.Space();
-            foreach (var issue in Validate(asset.Steps))
+            var report = TrainingScenarioValidator.Validate(asset.ToScenario());
+            foreach (var message in report.Messages)
             {
-                EditorGUILayout.HelpBox(issue.message, issue.warning ? MessageType.Warning : MessageType.Info);
+                EditorGUILayout.HelpBox(message.Message, ToMessageType(message.Severity));
+            }
+
+            if (asset.Steps.Count == 0)
+            {
+                EditorGUILayout.HelpBox("With no steps, the service falls back to the built-in demo scenario at load.", MessageType.Info);
             }
 
             EditorGUILayout.Space();
@@ -80,62 +87,22 @@ namespace QuestVisionStream.Editor
                     ExportJson(asset);
                 }
             }
+
+            EditorGUILayout.HelpBox(
+                "Author scenarios visually as mermaid diagrams with the Python training builder " +
+                "(V2/com.ethar.trainingstatemachine.python/builder.py): md2json → Import JSON here; " +
+                "Export JSON → json2md to review the diagram. See Documentation/Training-Builder.md.",
+                MessageType.None);
         }
 
-        /// <summary>
-        /// Static checks mirroring how <see cref="TrainingStateMachine"/> walks the
-        /// queue, so authoring mistakes surface here instead of on device.
-        /// </summary>
-        internal static IEnumerable<(string message, bool warning)> Validate(IReadOnlyList<TrainingStepDefinition> steps)
+        private static MessageType ToMessageType(TrainingValidationSeverity severity)
         {
-            if (steps == null || steps.Count == 0)
+            switch (severity)
             {
-                yield return ("Scenario has no steps — the service will fall back to the built-in demo.", true);
-                yield break;
+                case TrainingValidationSeverity.Error: return MessageType.Error;
+                case TrainingValidationSeverity.Warning: return MessageType.Warning;
+                default: return MessageType.Info;
             }
-
-            if (!string.IsNullOrEmpty(steps[0].waitingClass))
-            {
-                yield return ($"Step 1 waits for '{steps[0].waitingClass}', but the entry step is activated by Begin — its Waiting Class is ignored.", true);
-            }
-
-            for (var i = 0; i < steps.Count; i++)
-            {
-                var step = steps[i];
-                var stepName = step.title.Length > 0 ? step.title : $"step {i + 1}";
-
-                if (i > 0 && string.IsNullOrEmpty(step.waitingClass))
-                {
-                    yield return ($"'{stepName}' has no Waiting Class — no arrival can ever activate it.", true);
-                }
-
-                if (string.IsNullOrEmpty(step.result))
-                {
-                    if (i < steps.Count - 1)
-                    {
-                        yield return ($"'{stepName}' has an empty Result — pressing its action completes the scenario, so the {steps.Count - 1 - i} step(s) after it are unreachable.", true);
-                    }
-
-                    continue;
-                }
-
-                var resolved = false;
-                for (var j = i + 1; j < steps.Count; j++)
-                {
-                    if (string.Equals(steps[j].waitingClass, step.result, StringComparison.OrdinalIgnoreCase))
-                    {
-                        resolved = true;
-                        break;
-                    }
-                }
-
-                if (!resolved)
-                {
-                    yield return ($"'{stepName}' expects '{step.result}', which matches no later step's Waiting Class — its arrival will end the scenario there.", i < steps.Count - 1);
-                }
-            }
-
-            yield return ($"Expected class queue: begin → {string.Join(" → ", steps.Select(step => string.IsNullOrEmpty(step.result) ? "complete" : step.result))}.", false);
         }
 
         private static void ImportJson(TrainingScenarioAsset asset)

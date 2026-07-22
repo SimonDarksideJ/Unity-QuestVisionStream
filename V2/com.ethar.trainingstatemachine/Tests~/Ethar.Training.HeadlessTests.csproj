@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Headless test runner: compiles the package's Runtime + EditMode test
+       sources directly and runs them under `dotnet test` — no Unity required
+       (the tests are pure NUnit; the runtime asmdef is noEngineReferences).
+       The folder's trailing '~' makes the Unity importer ignore it. This is
+       verification infrastructure only — it contains no logic of its own. -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Runtime/**/*.cs" />
+    <Compile Include="../Tests/Editor/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same Newtonsoft.Json major the Unity package resolves via com.unity.nuget.newtonsoft-json. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+  </ItemGroup>
+
+</Project>

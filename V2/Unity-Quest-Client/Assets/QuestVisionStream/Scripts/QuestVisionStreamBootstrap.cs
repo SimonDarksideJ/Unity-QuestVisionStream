@@ -1,6 +1,7 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
+using System.Collections.Generic;
 using Ethar.DebugDrawingBBox;
 using QuestVisionStream.Core;
 using QuestVisionStream.Services;
@@ -71,6 +72,11 @@ namespace QuestVisionStream.Client
         [Tooltip("Simple-mode alignment aid — pitches detection rays down to offset the passthrough camera mount (positive = boxes down). 11° is the on-device tuned value for arm's-length desk objects; hold Y + L-stick to re-tune live, or 0 to disable. A fixed-depth approximation; the depth/anchored mode is the accurate fix.")]
         private float cameraPitchCompensationDegrees = 11f;
 
+        [Header("Debug")]
+        [SerializeField]
+        [Tooltip("Start with the debug visuals (detection HUD window, detection boxes, connection dot) visible. OFF by default — the trainee sees only the training UX and world labels. Toggle at runtime with the LEFT controller MENU button.")]
+        private bool debugVisualsAtStart = false;
+
         [Header("Quality")]
         [SerializeField]
         private bool enableQualifier = true;
@@ -92,6 +98,10 @@ namespace QuestVisionStream.Client
         [Tooltip("Built-in Ethar UX Training palette for the training UX: 0 = Dark·Cyan, 1 = Light·Teal, 2 = Hi-Vis·Orange.")]
         private int trainingThemeIndex = 0;
 
+        [SerializeField]
+        [Tooltip("Model catalog for training steps: maps a step's Model Ref key to the prefab spawned aligned to the step's AprilTag when the step activates.")]
+        private List<TrainingModelEntry> trainingModels = new List<TrainingModelEntry>();
+
         [Header("AprilTags")]
         [SerializeField]
         private bool enableAprilTags = true;
@@ -100,6 +110,10 @@ namespace QuestVisionStream.Client
         [Tooltip("Physical printed tag width in meters (tagStandard41h12 sheets from V2/tools/generate-apriltags.py).")]
         private float tagSizeMeters = 0.1f;
 
+        [SerializeField]
+        [Tooltip("Republish tag sightings into the detection pipeline as ClassName detections (label = registry Class Name), so AprilTags render, log and drive the training flow exactly like server detections — including fully offline.")]
+        private bool bridgeTagsToDetections = true;
+
         private const float PitchTuneRateDegreesPerSecond = 20f;
 
         private ServiceManager serviceManager;
@@ -107,6 +121,10 @@ namespace QuestVisionStream.Client
         private InputAction tagBehaviourAction;
         private InputAction tunePitchHoldAction;
         private InputAction tunePitchAxisAction;
+        private InputAction debugToggleAction;
+        private GameObject connectionDotObject;
+        private GameObject detectionHudObject;
+        private bool debugVisualsVisible;
         private IPoseTrackingService poseTracking;
         private RoomScanController roomScan;
         private EnvironmentDepthProvider environmentDepth;
@@ -155,9 +173,9 @@ namespace QuestVisionStream.Client
 
                 // At-a-glance connection dot (green/red, top right). Text-free — all
                 // logging/messaging lives in the log window below.
-                var connectionDot = new GameObject("QVS_ConnectionDot");
-                connectionDot.transform.SetParent(camera.transform, false);
-                connectionDot.AddComponent<ConnectionDotController>().Initialize(status);
+                connectionDotObject = new GameObject("QVS_ConnectionDot");
+                connectionDotObject.transform.SetParent(camera.transform, false);
+                connectionDotObject.AddComponent<ConnectionDotController>().Initialize(status);
 
                 // THE log window: the left-third translucent panel with the live
                 // detection feed plus the status/diagnostics section. All logging/
@@ -168,9 +186,9 @@ namespace QuestVisionStream.Client
                     serviceManager.TryGetService<IDetectionRendererService>(out var rendererService);
                     serviceManager.TryGetService<IPoseTrackingService>(out poseTracking);
                     serviceManager.TryGetService<IAnchoredTagRenderModule>(out var anchoredModule);
-                    var detectionHud = new GameObject("QVS_DetectionHud");
-                    detectionHud.transform.SetParent(camera.transform, false);
-                    detectionHud.AddComponent<DetectionHudController>().Initialize(
+                    detectionHudObject = new GameObject("QVS_DetectionHud");
+                    detectionHudObject.transform.SetParent(camera.transform, false);
+                    detectionHudObject.AddComponent<DetectionHudController>().Initialize(
                         detectionService, rendererService, poseTracking, anchoredModule,
                         status, webrtcService, signalingService);
                 }
@@ -186,6 +204,17 @@ namespace QuestVisionStream.Client
                         .Initialize(status, webrtcService, signalingService, cameraService);
                 }
             }
+
+            // MENU (left controller) toggles ALL debug visuals — the detection HUD
+            // window, the drawn detection boxes and the connection dot. OFF by
+            // default: the trainee sees only the training UX and world labels.
+            debugToggleAction = new InputAction("QVS Debug Toggle", InputActionType.Button);
+            // Control name differs across XR layouts — bind both so it resolves.
+            debugToggleAction.AddBinding("<XRController>{LeftHand}/menu");
+            debugToggleAction.AddBinding("<XRController>{LeftHand}/menuButton");
+            debugToggleAction.performed += _ => SetDebugVisuals(!debugVisualsVisible);
+            debugToggleAction.Enable();
+            SetDebugVisuals(debugVisualsAtStart);
 
             // X (left controller) toggles between the two detection render modules
             // at runtime — outline boxes <-> anchored tags — for A/B testing on device.
@@ -239,6 +268,35 @@ namespace QuestVisionStream.Client
                     Run = tag => Debug.Log($"[QVS:Rule] First sighting of {tag.TagName} (#{tag.Id}) at {tag.WorldPose.position}")
                 });
             }
+        }
+
+        /// <summary>
+        /// Show/hide ALL debug visuals: the detection HUD window, the drawn
+        /// detection boxes (renderer service master switch — visuals cleared on
+        /// off, module selection kept) and the connection dot. The training UX
+        /// (warm-up card, step forms, hand menu, world labels) is never touched.
+        /// </summary>
+        public void SetDebugVisuals(bool visible)
+        {
+            debugVisualsVisible = visible;
+
+            if (detectionHudObject != null)
+            {
+                detectionHudObject.SetActive(visible);
+            }
+
+            if (connectionDotObject != null)
+            {
+                connectionDotObject.SetActive(visible);
+            }
+
+            if (serviceManager != null &&
+                serviceManager.TryGetService<IDetectionRendererService>(out var renderer))
+            {
+                renderer.RenderingEnabled = visible;
+            }
+
+            Debug.Log($"[QVS] Debug visuals {(visible ? "ON" : "OFF")} (left-controller MENU toggles)");
         }
 
         /// <summary>Switch the detection renderer at runtime (also exposed for UI/inspector callers).</summary>
@@ -320,6 +378,7 @@ namespace QuestVisionStream.Client
             tagBehaviourAction?.Dispose();
             tunePitchHoldAction?.Dispose();
             tunePitchAxisAction?.Dispose();
+            debugToggleAction?.Dispose();
         }
 
         /// <summary>
@@ -497,6 +556,27 @@ namespace QuestVisionStream.Client
                 placementProfile.TagSizeMeters = tagSizeMeters;
                 serviceManager.TryCreateAndRegisterService<ITagPlacementService>(
                     typeof(TagPlacementService), out _, "Tag Placement", 42u, placementProfile);
+
+                // Tag → detection bridge (43): republish sightings into the
+                // detection pipeline as ClassName detections. Tags detect, the
+                // bridge translates, the training engine decides.
+                if (bridgeTagsToDetections)
+                {
+                    var bridgeProfile = ScriptableObject.CreateInstance<TagDetectionBridgeServiceProfile>();
+                    serviceManager.TryCreateAndRegisterService<ITagDetectionBridgeService>(
+                        typeof(TagDetectionBridgeService), out _, "Tag Detection Bridge", 43u, bridgeProfile);
+                }
+
+                // Training model placement (47): steps carrying a Model Ref spawn
+                // their catalog prefab aligned to the step's tag (registered after
+                // both the tag and training services it consumes).
+                if (enableTraining)
+                {
+                    var modelProfile = ScriptableObject.CreateInstance<TrainingModelPlacementServiceProfile>();
+                    modelProfile.Catalog = trainingModels;
+                    serviceManager.TryCreateAndRegisterService<ITrainingModelPlacementService>(
+                        typeof(TrainingModelPlacementService), out _, "Training Model Placement", 47u, modelProfile);
+                }
             }
 
             // --- Status (50) ---

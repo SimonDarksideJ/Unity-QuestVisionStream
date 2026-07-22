@@ -26,6 +26,9 @@ detection renderers and tag detector backends are all swappable modules.
 | `ITagDetectionService` (40) | Throttled on-device tag decode | `ITagDetectorModule` (`KeijiroAprilTagDetectorModule`, tagStandard41h12) |
 | `ITagRoutingService` (41) | enter/update/exit lifecycle + rules engine | — |
 | `ITagPlacementService` (42) | Coloured world-space tag markers | — |
+| `ITagDetectionBridgeService` (43) | Republishes tag sightings into the detection pipeline as ClassName detections (label = registry class name) — tags drive rendering and training like server detections, offline-capable | — |
+| `ITrainingStateService` (45) | The authoritative training flow (queue of expected classes over the detection pipeline) | — |
+| `ITrainingModelPlacementService` (47) | Spawns a step's `modelRef` catalog prefab aligned to the step's AprilTag (`TagPoseFollower` keeps it aligned) | — |
 | `IStatusService` (50) | Status model + HUD source + server uplink | — |
 
 ## Notes

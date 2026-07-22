@@ -55,6 +55,31 @@ namespace QuestVisionStream.Tests
         }
 
         [Test]
+        public void ToScenario_CarriesModelRefBothWays()
+        {
+            asset.Steps.Add(new TrainingStepDefinition
+            {
+                title = "Station 1",
+                options = { "Go" },
+                detectedClass = "station1",
+                label = "Station 1",
+                modelRef = "pumpAssembly",
+                result = "station1"
+            });
+
+            var scenario = asset.ToScenario();
+            Assert.That(scenario.Steps[0].ModelRef, Is.EqualTo("pumpAssembly"));
+            Assert.That(scenario.Steps[0].HasModel, Is.True);
+
+            asset.FromScenario(scenario);
+            Assert.That(asset.Steps[0].modelRef, Is.EqualTo("pumpAssembly"));
+
+            var json = TrainingScenarioParser.ToJson(scenario);
+            Assert.That(TrainingScenarioParser.TryParse(json, out var reparsed), Is.True);
+            Assert.That(reparsed.Steps[0].ModelRef, Is.EqualTo("pumpAssembly"), "modelRef survives the wire format");
+        }
+
+        [Test]
         public void FromScenario_RoundTripsThroughTheWireFormat()
         {
             var demo = TrainingScenarioLibrary.EtharDemo();

@@ -57,6 +57,15 @@ namespace Ethar.DebugDrawingBBox
         string ActiveModuleName { get; }
 
         /// <summary>
+        /// Master visibility for the debug drawing. When false, incoming batches
+        /// are ignored and the active module's visuals are cleared — the module
+        /// selection is kept, so re-enabling resumes on the next batch. Hosts
+        /// bind this to their debug toggle (boxes are diagnostic visuals; the
+        /// training UX renders independently).
+        /// </summary>
+        bool RenderingEnabled { get; set; }
+
+        /// <summary>
         /// Switch the active module by service module name. The outgoing module is
         /// cleared and deactivated first. Returns false when no module matches.
         /// </summary>

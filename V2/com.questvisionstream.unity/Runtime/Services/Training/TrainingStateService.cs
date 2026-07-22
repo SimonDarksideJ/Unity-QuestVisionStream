@@ -202,7 +202,10 @@ namespace QuestVisionStream.Services
         }
 
         private void OnDetectionsReceived(DetectionArrival arrival)
-            => ProcessBatch(arrival.Batch, arrival.ArrivalTimeMs, TrainingClassSource.Detection);
+            => ProcessBatch(arrival.Batch, arrival.ArrivalTimeMs,
+                arrival.Origin == DetectionOrigin.AprilTag
+                    ? TrainingClassSource.AprilTag
+                    : TrainingClassSource.Detection);
 
         /// <summary>
         /// The single class-arrival handler — real detections and synthetic action

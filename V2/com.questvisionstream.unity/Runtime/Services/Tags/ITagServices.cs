@@ -60,6 +60,16 @@ namespace QuestVisionStream.Services
     {
         public int Id { get; internal set; }
         public string TagName { get; internal set; }
+
+        /// <summary>
+        /// The detection-pipeline class token this tag stands for (registry
+        /// <see cref="TagDefinition.EffectiveClassName"/>). This is the identity
+        /// the ClassName architecture unifies on: the bridge publishes it as the
+        /// detection <c>label</c>, and training steps match it as
+        /// <c>waitingClass</c>/<c>detectedClass</c>.
+        /// </summary>
+        public string ClassName { get; internal set; }
+
         public Color Color { get; internal set; }
         public Pose WorldPose { get; internal set; }
         public double FirstSeenMs { get; internal set; }
@@ -126,5 +136,21 @@ namespace QuestVisionStream.Services
     {
         /// <summary>Remove all placed markers.</summary>
         void Clear();
+    }
+
+    /// <summary>
+    /// Bridges tag routing events into the detection pipeline: each sighting is
+    /// republished through <see cref="IDetectionService.PublishLocal"/> as a
+    /// wire-shaped detections payload whose label is the tag's registry
+    /// <see cref="TagObservation.ClassName"/>. This unifies AprilTags under the
+    /// ClassName architecture — tags render, log and drive the training flow
+    /// exactly like server detections, and can augment or replace the ML detector
+    /// entirely (offline mode). The tag services stay untouched: tags detect,
+    /// this bridge only translates.
+    /// </summary>
+    public interface ITagDetectionBridgeService : IService
+    {
+        /// <summary>Payloads published into the detection pipeline this session.</summary>
+        long PublishedCount { get; }
     }
 }

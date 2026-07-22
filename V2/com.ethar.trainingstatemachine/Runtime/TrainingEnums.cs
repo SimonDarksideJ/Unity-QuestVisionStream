@@ -10,7 +10,14 @@ namespace Ethar.Training
         Detection = 0,
 
         /// <summary>The synthetic "detected class from pressing an action" on a training form.</summary>
-        ActionResponse
+        ActionResponse,
+
+        /// <summary>
+        /// An on-device fiducial sighting (e.g. AprilTag) bridged into the class
+        /// pipeline. Deterministic — always full confidence, never gated by
+        /// <see cref="TrainingStateMachine.MinimumDetectionConfidence"/>.
+        /// </summary>
+        AprilTag
     }
 
     /// <summary>Lifecycle of a loaded scenario.</summary>

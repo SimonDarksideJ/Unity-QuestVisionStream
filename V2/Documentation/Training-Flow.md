@@ -1,5 +1,10 @@
 # Training Flow — State Service + Presentation Service
 
+> 📖 The canonical scenario **wire format and capability reference** (aligned
+> against both the C# package and its standalone Python export) is
+> [Training-Configuration-Reference.md](Training-Configuration-Reference.md).
+> This document covers the Unity client's end-to-end flow and UX.
+
 The authoritative training flow for the Quest client: a **Training State
 Service** that manages a queue of expected detection classes, and a **Training
 Presentation Service** that turns each activated step into UX — a display-menu
@@ -46,6 +51,7 @@ Each step:
 | `detectedClass` | Class to annotate in the world while the step is active. |
 | `label` | Text for the location indicator placed at that class's box centre. |
 | `imageRef` | Client-side image reference (currently the shared camera-on-grey placeholder). |
+| `modelRef` | Model catalog key: while this step is active, the host spawns the mapped prefab **aligned to the AprilTag** whose registry class name matches `detectedClass` (falling back to `waitingClass`). Empty = no model. |
 | `result` | **The next expected class.** Arrives either as a real detection or as the synthetic "detected class from pressing an action". Empty = final step; its action completes the scenario. |
 
 Because each step's `result` is the next step's `waitingClass`, the state
@@ -88,8 +94,9 @@ wants to move on. If a step must be detection-only, give it no options.)
 
 ### `ITrainingStateService` (package — `Runtime/Services/Training/`)
 
-- Wraps the pure, EditMode-tested `TrainingStateMachine`
-  (`Runtime/Training/TrainingStateMachine.cs`).
+- Wraps the pure, EditMode-tested `TrainingStateMachine` from the
+  engine-agnostic **`com.ethar.trainingstatemachine`** package (mirrored 1:1 by
+  `com.ethar.trainingstatemachine.python`).
 - Subscribes to `IDetectionService.DetectionsReceived` — the detection service
   is always sending; the queue filter makes the flow authoritative.
 - Events: `ScenarioLoaded`, `StepActivated` (with the triggering
@@ -149,6 +156,41 @@ and the whole uGUI kit:
   with a circular reticle laid flat on the surface, and every button carries
   `ButtonHoverGlow` — a slight expand plus accent glow while the ray is on it.
 
+## AprilTags in the training flow — offline detections and tag-aligned models
+
+Printed AprilTags are unified under the same **ClassName architecture** as
+server detections, with a strict delineation:
+
+1. **Tag detects** — the on-device tag pipeline is unchanged
+   (`ITagDetectionService` → `ITagRoutingService`, priorities 40/41).
+2. **Bridge translates** — `ITagDetectionBridgeService` (43) republishes each
+   sighting through `IDetectionService.PublishLocal` as a wire-shaped
+   detections payload: `label` = the tag's registry **Class Name**
+   (`TagDefinition.ClassName`, falling back to its display name), `conf` = 1.0,
+   box projected around the tag's viewport position (`frame = -2` marks tag
+   payloads; action responses use `-1`). One parser, one batch handler — a tag
+   sighting *is* a detected class, exactly like an action press.
+3. **Engine decides** — the state machine sees the class arrive with source
+   `AprilTag` and advances `waitingClass` steps / re-sights `detectedClass`
+   like any other arrival. Give a registry entry `ClassName = "tv"` and the
+   demo's "Look for a Monitor" step advances from the printed tag with **no
+   server and no ML model** — augmenting YOLO when connected, replacing it
+   offline (`bridgeTagsToDetections` on the bootstrap).
+4. **Placement instantiates** — when an activated step carries `modelRef`,
+   `ITrainingModelPlacementService` (47) resolves it through the host's model
+   catalog (Bootstrap ▸ Training Models) and instantiates the prefab aligned
+   to the tag whose class name matches the step's `detectedClass` (or
+   `waitingClass`) — immediately if the tag is tracked, else the moment it
+   enters view.
+
+The **connecting component** is `TagPoseFollower`: bound to one tag id, it
+snaps to the first observed pose and then smooths toward every fresh sighting
+(SmoothDamp position + slerped rotation), freezing at the last pose when the
+tag leaves view (TTL exit) and self-healing when it re-enters — including
+after a recenter, since re-entry carries the corrected world pose. Chosen over
+parenting to the debug tag markers (ties model lifetime to a disableable
+visual) and per-sighting re-instantiation (allocation churn, no smoothing).
+
 ## Launch pattern
 
 The whole connection warms up **behind the intro card**, so entering is
@@ -177,27 +219,45 @@ Hi-Vis·Orange — the swappable Ethar UX Training palettes).
 
 ## Authoring a new scenario
 
+**Visual route (recommended):** draw the flow as a mermaid diagram and
+convert it with the **training builder**
+([Training-Builder.md](Training-Builder.md)) — `builder.py md2json flow.md -o
+scenario.json` (or start from a spreadsheet with `csv2md`/`csv2json`), review
+the validation report, then **Import JSON…** on the asset below.
+
+**In-inspector route:**
+
 1. **Create → QuestVisionStream → Training Scenario** and edit the queue in the
    inspector — keep the chain rule: *each step's `result` is a later step's
    `waitingClass`*, and the final step's `result` empty. The inspector
-   validates the chain live (unreachable steps, dead-end results, early
-   completion) and shows the expected-class queue.
-2. Use detector class names (`tv`, `person`, …) for steps advanced by vision;
-   use any unique token (`begintraining`, `foundtv`, …) for steps advanced by
-   an action press.
+   validates the chain live via the shared `TrainingScenarioValidator`
+   (unreachable steps, dead-end results, early completion) and shows the
+   expected-class queue — the same report the builder CLI prints.
+2. Use detector class names (`tv`, `person`, …) — or AprilTag registry class
+   names — for steps advanced by vision; use any unique token
+   (`begintraining`, `foundtv`, …) for steps advanced by an action press.
+   Give a step a `modelRef` to spawn its catalog model aligned to the step's
+   tag.
 3. Assign the asset to **Bootstrap ▸ Training Scenario** (or replace
    `Assets/QuestVisionStream/Resources/EtharTrainingScenario.asset`).
 
 The inspector's **Import JSON… / Export JSON…** buttons round-trip the wire
-format (`TrainingScenarioParser`); an asset with no steps is rejected at load
-and the built-in demo is the last-resort fallback.
+format (`TrainingScenarioParser`) — JSON is the interchange with the builder
+(`json2md` turns an exported asset back into a reviewable diagram); an asset
+with no steps is rejected at load and the built-in demo is the last-resort
+fallback.
 
 ## Tests
 
-`com.questvisionstream.unity/Tests/Editor/`:
-
-- `TrainingScenarioTests` — JSON parsing, queue chain rule, round-trip,
-  malformed-input rejection, demo-vs-Excel fidelity.
-- `TrainingStateMachineTests` — the full Excel flow end to end, discard
-  behaviour, case-insensitivity, reset/restart, and the synthetic
+- `com.ethar.trainingstatemachine/Tests/Editor/` — the core suite
+  (`TrainingScenarioParserTests`, `TrainingStateMachineTests`,
+  `TrainingProcessingTests`, `TrainingValidatorTests`): parsing/round-trip,
+  the full demo flow, discard behaviour, case-insensitivity, reset/restart,
+  and the chain validator. Runs in the Unity Test Runner **or** headless via
+  `dotnet test Tests~` (no Unity required).
+- `com.questvisionstream.unity/Tests/Editor/` — the wire-protocol bridges
+  (`TrainingResponseMessageTests`, `TagDetectionMessageTests`) and the
+  authoring asset (`TrainingScenarioAssetTests`), including the synthetic
   response-as-detection path through the real channel parser.
+- `com.ethar.trainingstatemachine.python/tests/` — the Python export's
+  mirror suite plus the builder tests (`python -m unittest discover`).

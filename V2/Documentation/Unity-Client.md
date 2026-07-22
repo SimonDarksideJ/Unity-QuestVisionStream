@@ -30,8 +30,22 @@ IDetectionRendererService (35)── IDetectionRenderModule: EphemeralBoxRenderM
 ITagDetectionService (40)     ── ITagDetectorModule: KeijiroAprilTagDetectorModule (41h12)
 ITagRoutingService (41)       enter/update/exit + rules ("see X → do Y")
 ITagPlacementService (42)     coloured tag markers
+ITagDetectionBridgeService (43) tag sighting → ClassName detection (PublishLocal)
+ITrainingStateService (45)    training flow: queue of expected classes
+ITrainingPresentationService (46) step forms + hand menu + world label (app)
+ITrainingModelPlacementService (47) step modelRef → prefab aligned to its tag
 IStatusService (50)           status model → in-headset HUD + server uplink
 ```
+
+**Debug visuals are OFF by default** — the trainee sees only the training UX
+(warm-up card, step forms, hand menu) and the world labels. The **left
+controller MENU button** toggles the debug set at runtime: the detection HUD
+log window, the drawn detection boxes (`IDetectionRendererService.RenderingEnabled`
+— visuals cleared on off, module selection kept) and the connection dot.
+`Bootstrap ▸ Debug ▸ Debug Visuals At Start` flips the default for
+development builds. With debug ON, the existing tuning inputs apply: X switches
+render modules, B toggles anchored-tag behaviour, Y+stick tunes pitch
+compensation.
 
 `Assets/Scenes/QuestVisionStream.unity` contains the full working hierarchy:
 

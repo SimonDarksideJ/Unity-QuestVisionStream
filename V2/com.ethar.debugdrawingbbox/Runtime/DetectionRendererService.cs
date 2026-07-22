@@ -35,6 +35,7 @@ namespace Ethar.DebugDrawingBBox
         private readonly List<XRInputSubsystem> inputSubsystems = new List<XRInputSubsystem>();
         private IDetectionRenderModule activeModule;
         private bool initialActivationDone;
+        private bool renderingEnabled = true;
 
         public DetectionRendererService(
             string name,
@@ -50,6 +51,27 @@ namespace Ethar.DebugDrawingBBox
         }
 
         public string ActiveModuleName => activeModule?.Name;
+
+        /// <inheritdoc />
+        public bool RenderingEnabled
+        {
+            get => renderingEnabled;
+            set
+            {
+                if (renderingEnabled == value)
+                {
+                    return;
+                }
+
+                renderingEnabled = value;
+                if (!renderingEnabled)
+                {
+                    activeModule?.Clear();
+                }
+
+                Debug.Log($"[QVS:Renderer] Debug drawing {(renderingEnabled ? "ON" : "OFF")}");
+            }
+        }
 
         /// <inheritdoc />
         public override void Start()
@@ -154,6 +176,11 @@ namespace Ethar.DebugDrawingBBox
 
         private void OnDetections(DetectionArrival arrival)
         {
+            if (!renderingEnabled)
+            {
+                return;
+            }
+
             if (activeModule == null)
             {
                 Debug.LogWarning($"[WSDetection] frame={arrival.Batch.Frame} NOT drawn — no active render module");

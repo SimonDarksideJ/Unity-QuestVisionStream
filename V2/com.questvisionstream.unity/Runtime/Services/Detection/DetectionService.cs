@@ -60,6 +60,7 @@ namespace QuestVisionStream.Services
         public event Action<DetectionArrival> DetectionsReceived;
 
         public long ReceivedCount { get; private set; }
+        public long LocalCount { get; private set; }
         public long InvalidCount { get; private set; }
 
         /// <inheritdoc />
@@ -74,6 +75,33 @@ namespace QuestVisionStream.Services
         {
             webrtc.DetectionMessageReceived -= OnDataChannelMessage;
             base.Destroy();
+        }
+
+        /// <inheritdoc />
+        public void PublishLocal(string json, DetectionOrigin origin)
+        {
+            if (DetectionChannelParser.Parse(json, out var payload) != DetectionChannelMessageKind.Detections)
+            {
+                InvalidCount++;
+                Debug.LogWarning($"[WSDetection] invalid LOCAL payload ({origin}) dropped #{InvalidCount}");
+                return;
+            }
+
+            LocalCount++;
+            var arrivalMs = poseTracking.NowMs;
+
+            // Local sources author viewport-native coordinates (origin bottom-left),
+            // so the capture-pipeline invert flags must not be applied here. No
+            // ObserveArrival either — local payloads carry no media pts and must
+            // not skew the server latency estimate.
+            var batch = DetectionMath.ToRenderBatch(payload, invertY: false, invertX: false);
+
+            if (profile.VerboseDetectionLogging)
+            {
+                Debug.Log($"[WSDetection] local({origin}) {DescribePayload(payload, batch)}");
+            }
+
+            DetectionsReceived?.Invoke(new DetectionArrival(payload, batch, arrivalMs, origin));
         }
 
         private void OnDataChannelMessage(string json)

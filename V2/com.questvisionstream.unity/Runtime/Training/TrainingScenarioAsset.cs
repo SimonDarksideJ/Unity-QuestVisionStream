@@ -41,11 +41,14 @@ namespace QuestVisionStream.Training
         [Tooltip("The next expected class — a later step's Waiting Class, arriving as a real detection or as this step's action result. Empty on the final step: pressing its action completes the scenario.")]
         public string result = string.Empty;
 
+        [Tooltip("Model catalog key spawned aligned to this step's tag (the AprilTag whose registry Class Name matches Detected Class, or Waiting Class). Empty = no model. The host's Training Model Placement catalog resolves the key to a prefab.")]
+        public string modelRef = string.Empty;
+
         /// <summary>Snapshot into the immutable runtime step (options copied).</summary>
         public TrainingStep ToStep() => new TrainingStep(
             waitingClass, title, description,
             options != null ? options.ToArray() : Array.Empty<string>(),
-            detectedClass, label, imageRef, result);
+            detectedClass, label, imageRef, result, modelRef);
 
         internal static TrainingStepDefinition FromStep(TrainingStep step) => new TrainingStepDefinition
         {
@@ -56,7 +59,8 @@ namespace QuestVisionStream.Training
             detectedClass = step.DetectedClass,
             label = step.Label,
             imageRef = step.ImageRef,
-            result = step.Result
+            result = step.Result,
+            modelRef = step.ModelRef
         };
     }
 

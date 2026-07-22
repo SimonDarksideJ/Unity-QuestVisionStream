@@ -22,6 +22,26 @@ standalone Python implementation lives alongside this package in
 | `TrainingStateMachine` | The component: state queue, confidence gate, class processing, events. |
 | `TrainingScenarioParser` | JSON parse/serialize for scenarios and configs (wire format). |
 | `TrainingScenarioLibrary` | Built-in Ethar demo scenario (also the test configuration). |
+| `TrainingScenarioValidator` / `TrainingValidationReport` | Chain-rule validation report (errors / warnings / info) — powers the Unity inspector's live checks; behavioural twin of the Python builder's `validate_scenario`. |
+
+> **Authoring tooling lives in the Python export** — mermaid-diagram and CSV
+> conversion is the `builder.py` CLI in
+> `com.ethar.trainingstatemachine.python` (one tool by design; scenario JSON
+> is the interchange this package parses). See
+> `V2/Documentation/Training-Builder.md`.
+
+## Headless tests (no Unity required)
+
+The EditMode tests are pure NUnit and the runtime has no engine references,
+so the whole suite also runs from the terminal / CI with the .NET SDK (8+):
+
+```bash
+dotnet test Tests~
+```
+
+`Tests~/` holds only the ~30-line runner csproj (verification infrastructure,
+no logic); the `~` suffix hides it from the Unity importer. In Unity, the same
+tests run normally via the Test Runner.
 
 ## Usage
 
@@ -60,16 +80,25 @@ their own events (e.g. attach detection geometry) without re-deriving state.
 
 ## Scenario JSON wire format
 
+> 📖 The full field-by-field schema and capability reference, aligned against
+> both this package and the standalone Python export, is
+> [`V2/Documentation/Training-Configuration-Reference.md`](../Documentation/Training-Configuration-Reference.md).
+
 ```json
 {
   "name": "Ethar Training Demo",
   "steps": [
     { "waitingClass": "", "title": "Welcome", "description": "…",
       "options": ["Begin"], "detectedClass": "", "label": "",
-      "imageRef": "camera", "result": "begintraining" }
+      "imageRef": "camera", "result": "begintraining", "modelRef": "" }
   ]
 }
 ```
+
+All step fields are optional and default to empty. `modelRef` is a
+host-resolved model catalog key: while the step is active, the host's
+placement layer spawns the mapped model aligned to the step's physical marker
+(e.g. AprilTag) — the machine itself never interprets it.
 
 A full machine config wraps a scenario:
 

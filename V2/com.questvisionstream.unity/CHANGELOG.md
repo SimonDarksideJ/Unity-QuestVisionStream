@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+- **AprilTags unified under the ClassName detection architecture.** New
+  `ITagDetectionBridgeService` (priority 43) republishes tag routing events
+  into the detection pipeline via the new
+  `IDetectionService.PublishLocal(json, origin)` ingress — same channel
+  parser, same batch handler, flip-free viewport-native normalization.
+  `TagDefinition`/`TagObservation` gained `ClassName` (registry-mapped class
+  token, falls back to the display name); `TagDetectionMessage` builds the
+  wire payload (`frame = -2`); `DetectionArrival` now carries a
+  `DetectionOrigin`, mapped to the new `TrainingClassSource.AprilTag` by the
+  training state service. With a registry class name matching a scenario's
+  `waitingClass`, printed tags advance the training flow with no server —
+  augmenting or fully replacing the ML detector offline.
+- **Training steps can spawn tag-aligned models.** The scenario model gained
+  `modelRef` (authoring field + wire key, additive); the new
+  `ITrainingModelPlacementService` (priority 47) resolves it through the
+  host's model catalog and instantiates the prefab aligned to the step's tag,
+  kept aligned by the new `TagPoseFollower` component (smoothed follow,
+  freeze at last pose on tag loss, self-healing on re-entry). Delineation:
+  tags detect → bridge translates → engine decides → placement instantiates.
+
+- **Scenario inspector validation now runs the shared core validator**
+  (`TrainingScenarioValidator` from `com.ethar.trainingstatemachine`) instead
+  of a private duplicate — the same checks the Python training builder prints
+  in its CLI report. Mermaid/CSV authoring is the Python builder
+  (`Documentation/Training-Builder.md`); scenario JSON remains the
+  interchange through the inspector's Import/Export JSON buttons.
+
 - **Breaking: training state machine extracted to `com.ethar.trainingstatemachine`**.
   `TrainingStateMachine`, `TrainingScenario`/`TrainingStep`,
   `TrainingScenarioParser`, `TrainingScenarioLibrary`, `TrainingStepResult`,

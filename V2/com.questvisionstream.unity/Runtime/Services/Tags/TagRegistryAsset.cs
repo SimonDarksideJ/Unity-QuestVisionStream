@@ -14,6 +14,17 @@ namespace QuestVisionStream.Services
         public int Id;
         public string Name;
         public Color Color;
+
+        [Tooltip("Detection-pipeline class token this tag stands for ('tv', 'station1', …) — what the training flow matches against. Empty falls back to Name.")]
+        public string ClassName;
+
+        /// <summary>
+        /// The class token this tag emits on the detection pipeline:
+        /// <see cref="ClassName"/> when set, otherwise <see cref="Name"/>. This is
+        /// the value the training flow's <c>waitingClass</c>/<c>detectedClass</c>
+        /// steps compare against (case-insensitive).
+        /// </summary>
+        public string EffectiveClassName => string.IsNullOrEmpty(ClassName) ? Name : ClassName;
     }
 
     /// <summary>

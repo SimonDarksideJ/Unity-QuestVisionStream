@@ -1,0 +1,86 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a5db65b0ea04e62b4dca1b1a0b1e668, type: 3}
+  m_Name: EtharTrainingScenarioExtended
+  m_EditorClassIdentifier:
+  scenarioName: Ethar Training Demo Extended
+  steps:
+  - waitingClass:
+    title: Welcome
+    description: Ready to begin your Ethar training?
+    options:
+    - Begin
+    detectedClass:
+    label:
+    imageRef: camera
+    modelRef:
+    result: begintraining
+  - waitingClass: begintraining
+    title: Look for a Monitor
+    description: Search your space and locate the monitor
+    options:
+    - Search
+    detectedClass:
+    label:
+    imageRef: camera
+    modelRef:
+    result: tv
+  - waitingClass: tv
+    title: TV Found
+    description: You found the TV - can you turn it on?
+    options:
+    - It's On
+    detectedClass: tv
+    label: This is a tv
+    imageRef: camera
+    modelRef:
+    result: tvon
+  - waitingClass: tvon
+    title: TV Is On
+    description: Good - the TV is on. Next, find the person
+    options:
+    - Next
+    detectedClass: tv
+    label: This is a tv
+    imageRef: camera
+    modelRef:
+    result: person
+  - waitingClass: person
+    title: Person Found
+    description: You found a person - please ask them to step back
+    options:
+    - Stepped Back
+    detectedClass: person
+    label: This is a person
+    imageRef: camera
+    modelRef:
+    result: personback
+  - waitingClass: personback
+    title: Person Stepped Back
+    description: Good - the person has stepped back
+    options:
+    - Next
+    detectedClass: person
+    label: This is a person
+    imageRef: camera
+    modelRef:
+    result: trainingdone
+  - waitingClass: trainingdone
+    title: Training Complete
+    description: Thank you for completing your training
+    options:
+    - End
+    detectedClass:
+    label:
+    imageRef: camera
+    modelRef:
+    result:
