@@ -21,6 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     as a reusable core report, shared by the builder and the Unity inspector.
   - Mirrored 1:1 in the Python port (`mermaid.py`, `csv_io.py`,
     `validation.py`, `builder.py` CLI).
+  - **`Builder~/` — the builder as a standalone dotnet CLI** (no Unity):
+    a console app compiled from this package's Runtime sources with the same
+    commands/flags/exit codes as the Python `builder.py`; outputs verified
+    byte-identical across the two CLIs. The `~` folder is invisible to the
+    Unity importer. Also enables running the whole test suite headless via
+    `dotnet test`.
 
 - `TrainingStep.ModelRef` (+ `HasModel`, wire key `modelRef`, additive and
   optional): a host-resolved model catalog key spawned aligned to the step's

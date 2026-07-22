@@ -188,8 +188,8 @@ No demo step sets `modelRef` — it defaults to empty everywhere.
 | **Tag-aligned models** | `modelRef` | ✅ | ✅ (data only — no scene host) | both (round-trip) |
 | Case-insensitive class match | — | ✅ | ✅ | both |
 | Graph validation (`TrainingScenarioValidator` / `validate_scenario`) | — | ✅ | ✅ | both |
-| **Mermaid builder** (markdown ⇄ config, shared dialect) | — | ✅ (`TrainingMermaidBuilder` + inspector buttons) | ✅ (`mermaid.py` + `builder.py` CLI) | both (round-trip) |
-| **CSV import** (spreadsheet → config, `;`-separated options) | — | ✅ (`TrainingCsvBuilder` + inspector button) | ✅ (`csv_io.py` + CLI) | both |
+| **Mermaid builder** (markdown ⇄ config, shared dialect) | — | ✅ (`TrainingMermaidBuilder` + inspector buttons + `Builder~` dotnet CLI) | ✅ (`mermaid.py` + `builder.py` CLI) | both (round-trip; CLI outputs byte-identical) |
+| **CSV import** (spreadsheet → config, `;`-separated options) | — | ✅ (`TrainingCsvBuilder` + inspector button + CLI) | ✅ (`csv_io.py` + CLI) | both |
 
 Cross-references: [Training-Flow.md](Training-Flow.md) (the Unity client's
 end-to-end flow and UX), the package READMEs

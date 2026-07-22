@@ -13,21 +13,40 @@ identical — see the parity policy in
 
 | Surface | Where | Conversions |
 |---|---|---|
-| **Unity inspector** | `TrainingScenarioAsset` inspector buttons (`com.questvisionstream.unity` Editor) | Import Markdown… / Export Markdown… / Import CSV… (plus the existing JSON import/export) — operates directly on the ScriptableObject |
+| **C# CLI** (`dotnet`, no Unity) | `com.ethar.trainingstatemachine/Builder~/` — a plain dotnet console app compiled from the package's Runtime sources; the `~` suffix hides the folder from the Unity importer | `md2json`, `json2md`, `csv2md`, `csv2json` |
 | **Python CLI** | `com.ethar.trainingstatemachine.python/builder.py` | `md2json`, `json2md`, `csv2md`, `csv2json` |
+| **Unity inspector** | `TrainingScenarioAsset` inspector buttons (`com.questvisionstream.unity` Editor) | Import Markdown… / Export Markdown… / Import CSV… (plus the existing JSON import/export) — operates directly on the ScriptableObject |
 | **Library APIs** | C# `TrainingMermaidBuilder` / `TrainingCsvBuilder` / `TrainingScenarioValidator`; Python `try_parse_markdown` / `to_markdown` / `try_parse_csv` / `validate_scenario` | embed in your own tooling |
 
+**Both CLIs are editor-independent VS Code tools** — the C# one runs the very
+same `Ethar.Training` sources the Unity package ships (`noEngineReferences`
+pure C#), so a scenario built at the terminal is bit-for-bit what the headset
+loads. The two CLIs take the same commands, flags and exit codes, and their
+outputs are verified **byte-identical** for the same input.
+
 ```bash
-# Python CLI
+# C# CLI — .NET SDK 8+, no Unity. Run from V2/ (or anywhere, adjust the path):
+dotnet run --project com.ethar.trainingstatemachine/Builder~ -- md2json  flow.md       -o scenario.json
+dotnet run --project com.ethar.trainingstatemachine/Builder~ -- json2md  scenario.json -o flow.md
+dotnet run --project com.ethar.trainingstatemachine/Builder~ -- csv2md   steps.csv     -o flow.md --name "Line 4 Training"
+dotnet run --project com.ethar.trainingstatemachine/Builder~ -- csv2json steps.csv     -o scenario.json --config --confidence 0.5
+# One-time: `dotnet build com.ethar.trainingstatemachine/Builder~` then run the
+# produced `ethar-training-builder` binary directly.
+
+# Python CLI — Python 3.8+, stdlib only. Run from the python package folder:
 python builder.py md2json  flow.md       -o scenario.json        # diagram → wire format
 python builder.py json2md  scenario.json -o flow.md              # wire format → diagram
 python builder.py csv2md   steps.csv     -o flow.md --name "Line 4 Training"
 python builder.py csv2json steps.csv     -o scenario.json --config --confidence 0.5
-# Exit codes: 0 = OK (warnings allowed), 2 = validation errors (nothing written).
+
+# Both: exit 0 = OK (warnings allowed), 2 = validation errors (nothing written);
+# the validation report prints to stderr.
 ```
 
 `examples/ethar_demo.md` in the Python package is the demo scenario generated
-by the builder — a working sample of everything below.
+by the builder — a working sample of everything below. The C# package's test
+suite also runs headless (`dotnet test` against the Runtime + Tests sources),
+so builder changes can be verified entirely from the terminal on both sides.
 
 ---
 
