@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The training builder CLI: a plain dotnet console app compiled straight
+       from the package's Runtime sources (noEngineReferences C#), so the SAME
+       code that runs in Unity runs here — no Unity installation required.
+       The folder's trailing '~' makes the Unity importer ignore it. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Ethar.Training.Builder</RootNamespace>
+    <AssemblyName>ethar-training-builder</AssemblyName>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../Runtime/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same Newtonsoft.Json major the Unity package resolves via com.unity.nuget.newtonsoft-json. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
