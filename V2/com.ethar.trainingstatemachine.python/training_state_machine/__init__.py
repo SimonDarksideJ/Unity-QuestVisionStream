@@ -28,6 +28,14 @@ from .parser import (
     config_to_json,
 )
 from .library import ethar_demo, ethar_demo_data, ethar_demo_config
+from .validation import (
+    ValidationSeverity,
+    ValidationMessage,
+    ValidationReport,
+    validate_scenario,
+)
+from .mermaid import try_parse_markdown, to_markdown
+from .csv_io import try_parse_csv
 
 __all__ = [
     "TrainingClassSource",
@@ -52,6 +60,13 @@ __all__ = [
     "ethar_demo",
     "ethar_demo_data",
     "ethar_demo_config",
+    "ValidationSeverity",
+    "ValidationMessage",
+    "ValidationReport",
+    "validate_scenario",
+    "try_parse_markdown",
+    "to_markdown",
+    "try_parse_csv",
 ]
 
 __version__ = "1.0.0"

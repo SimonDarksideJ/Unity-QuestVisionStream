@@ -146,8 +146,8 @@ The machine interprets **only** `waitingClass`, `result`, `options` (count),
 | Class arrivals — server | Host ingress | `DetectionService` (WebRTC data channel) | Type a class in `console.py` |
 | Class arrivals — action press | Host ingress | `TrainingResponseMessage` → same channel parser (`frame -1`) | `press [n]` in `console.py` |
 | Class arrivals — AprilTag | Host ingress | `TagDetectionBridgeService` (43) → `IDetectionService.PublishLocal` (`frame -2`); registry `TagDefinition.ClassName` maps tag id → class token | n/a (tags are on-device) |
-| Authoring | Host | `TrainingScenarioAsset` (ScriptableObject) + inspector with live chain validation + JSON import/export | Hand-authored JSON (`examples/ethar_demo.json`) |
-| Graph validation (unreachable / dead-end / early-completion) | Host (editor-only today) | `TrainingScenarioAssetEditor.Validate` | **None** — structural parse only (known gap; port planned for a headless validator) |
+| Authoring | Host | `TrainingScenarioAsset` (ScriptableObject) + inspector with live chain validation + JSON/Markdown/CSV import & export ([Training-Builder.md](Training-Builder.md)) | Mermaid/CSV/JSON via the `builder.py` CLI ([Training-Builder.md](Training-Builder.md)) |
+| Graph validation (unreachable / dead-end / early-completion) | **Core** (both packages) | `TrainingScenarioValidator` (inspector + builder) | `validate_scenario` (builder CLI report) |
 
 **Offline capability (Unity host):** with `bridgeTagsToDetections` enabled and
 registry class names matching scenario tokens, printed AprilTags advance the
@@ -187,7 +187,9 @@ No demo step sets `modelRef` — it defaults to empty everywhere.
 | **AprilTag source (2)** | — | ✅ | ✅ | both |
 | **Tag-aligned models** | `modelRef` | ✅ | ✅ (data only — no scene host) | both (round-trip) |
 | Case-insensitive class match | — | ✅ | ✅ | both |
-| Graph validation | — | ✅ editor-only | ❌ | C# only |
+| Graph validation (`TrainingScenarioValidator` / `validate_scenario`) | — | ✅ | ✅ | both |
+| **Mermaid builder** (markdown ⇄ config, shared dialect) | — | ✅ (`TrainingMermaidBuilder` + inspector buttons) | ✅ (`mermaid.py` + `builder.py` CLI) | both (round-trip) |
+| **CSV import** (spreadsheet → config, `;`-separated options) | — | ✅ (`TrainingCsvBuilder` + inspector button) | ✅ (`csv_io.py` + CLI) | both |
 
 Cross-references: [Training-Flow.md](Training-Flow.md) (the Unity client's
 end-to-end flow and UX), the package READMEs

@@ -22,6 +22,9 @@ standalone Python implementation lives alongside this package in
 | `TrainingStateMachine` | The component: state queue, confidence gate, class processing, events. |
 | `TrainingScenarioParser` | JSON parse/serialize for scenarios and configs (wire format). |
 | `TrainingScenarioLibrary` | Built-in Ethar demo scenario (also the test configuration). |
+| `TrainingMermaidBuilder` | The training builder: markdown+mermaid document ⇄ scenario (shared dialect — see `V2/Documentation/Training-Builder.md`). |
+| `TrainingCsvBuilder` | Spreadsheet CSV → scenario import. |
+| `TrainingScenarioValidator` / `TrainingValidationReport` | Chain-rule validation report (errors / warnings / info), shared by the builder and the Unity inspector. |
 
 ## Usage
 

@@ -18,10 +18,26 @@ is identical across both runtimes.
 
 ```
 training_state_machine/   the package (enums, scenario model, config data,
-                          machine, JSON parser, demo library)
+                          machine, JSON parser, demo library, validation,
+                          mermaid + CSV builders)
 console.py                interactive console harness
+builder.py                training builder CLI (md2json / json2md / csv2md / csv2json)
 examples/ethar_demo.json  the demo configuration, serialized (shared wire format)
-tests/                    unittest suite (valid / ignore / result processing)
+examples/ethar_demo.md    the same configuration as a mermaid document (builder output)
+tests/                    unittest suite (valid / ignore / result processing / builder)
+```
+
+## Training builder
+
+Author scenarios as mermaid diagrams and convert both ways, or import from a
+spreadsheet CSV — every conversion prints a validation report (dialect and
+usage: `V2/Documentation/Training-Builder.md`):
+
+```bash
+python builder.py md2json  flow.md       -o scenario.json
+python builder.py json2md  scenario.json -o flow.md
+python builder.py csv2md   steps.csv     -o flow.md --name "Line 4 Training"
+python builder.py csv2json steps.csv     -o scenario.json --config --confidence 0.5
 ```
 
 ## Console harness

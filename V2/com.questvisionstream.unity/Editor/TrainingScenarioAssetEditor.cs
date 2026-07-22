@@ -80,6 +80,28 @@ namespace QuestVisionStream.Editor
                     ExportJson(asset);
                 }
             }
+
+            // The training builder: the mermaid diagram IS the configuration —
+            // visual authoring/verification round-trips through the shared
+            // dialect (see Documentation/Training-Builder.md). CSV accelerates
+            // spreadsheet imports. Same conversions as the Python builder CLI.
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Import Markdown…"))
+                {
+                    ImportMarkdown(asset);
+                }
+
+                if (GUILayout.Button("Export Markdown…"))
+                {
+                    ExportMarkdown(asset);
+                }
+
+                if (GUILayout.Button("Import CSV…"))
+                {
+                    ImportCsv(asset);
+                }
+            }
         }
 
         /// <summary>
@@ -167,6 +189,82 @@ namespace QuestVisionStream.Editor
 
             File.WriteAllText(path, TrainingScenarioParser.ToJson(asset.ToScenario()));
             AssetDatabase.Refresh();
+        }
+
+        private static void ImportMarkdown(TrainingScenarioAsset asset)
+        {
+            var path = EditorUtility.OpenFilePanel("Import training scenario markdown (mermaid)", Application.dataPath, "md");
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            var ok = TrainingMermaidBuilder.TryParseMarkdown(File.ReadAllText(path), out var scenario, out _, out var builderReport);
+            if (!ok)
+            {
+                EditorUtility.DisplayDialog("Import failed", Summarize(builderReport), "OK");
+                return;
+            }
+
+            Undo.RecordObject(asset, "Import Training Scenario Markdown");
+            asset.FromScenario(scenario);
+            EditorUtility.SetDirty(asset);
+            EditorUtility.DisplayDialog("Markdown imported", Summarize(builderReport), "OK");
+        }
+
+        private static void ExportMarkdown(TrainingScenarioAsset asset)
+        {
+            var path = EditorUtility.SaveFilePanel("Export training scenario markdown (mermaid)", Application.dataPath, asset.name, "md");
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            File.WriteAllText(path, TrainingMermaidBuilder.ToMarkdown(asset.ToScenario()));
+            AssetDatabase.Refresh();
+        }
+
+        private static void ImportCsv(TrainingScenarioAsset asset)
+        {
+            var path = EditorUtility.OpenFilePanel("Import training scenario CSV", Application.dataPath, "csv");
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            var ok = TrainingCsvBuilder.TryParseCsv(
+                File.ReadAllText(path), out var scenario, out var builderReport,
+                name: Path.GetFileNameWithoutExtension(path));
+            if (!ok)
+            {
+                EditorUtility.DisplayDialog("Import failed", Summarize(builderReport), "OK");
+                return;
+            }
+
+            Undo.RecordObject(asset, "Import Training Scenario CSV");
+            asset.FromScenario(scenario);
+            EditorUtility.SetDirty(asset);
+            EditorUtility.DisplayDialog("CSV imported", Summarize(builderReport), "OK");
+        }
+
+        /// <summary>Validation report → dialog body (bounded, so a long report can't overflow the dialog).</summary>
+        private static string Summarize(TrainingValidationReport report)
+        {
+            const int maxLines = 14;
+            var lines = report.Messages.Select(message => message.ToString()).ToList();
+            if (lines.Count == 0)
+            {
+                return "No findings.";
+            }
+
+            if (lines.Count > maxLines)
+            {
+                var hidden = lines.Count - maxLines;
+                lines = lines.Take(maxLines).ToList();
+                lines.Add($"… and {hidden} more (see the inspector validation below).");
+            }
+
+            return string.Join("\n", lines);
         }
     }
 }
