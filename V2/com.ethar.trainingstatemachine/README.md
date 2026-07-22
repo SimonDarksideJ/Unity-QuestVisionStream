@@ -22,27 +22,13 @@ standalone Python implementation lives alongside this package in
 | `TrainingStateMachine` | The component: state queue, confidence gate, class processing, events. |
 | `TrainingScenarioParser` | JSON parse/serialize for scenarios and configs (wire format). |
 | `TrainingScenarioLibrary` | Built-in Ethar demo scenario (also the test configuration). |
-| `TrainingMermaidBuilder` | The training builder: markdown+mermaid document ⇄ scenario (shared dialect — see `V2/Documentation/Training-Builder.md`). |
-| `TrainingCsvBuilder` | Spreadsheet CSV → scenario import. |
-| `TrainingScenarioValidator` / `TrainingValidationReport` | Chain-rule validation report (errors / warnings / info), shared by the builder and the Unity inspector. |
+| `TrainingScenarioValidator` / `TrainingValidationReport` | Chain-rule validation report (errors / warnings / info) — powers the Unity inspector's live checks; behavioural twin of the Python builder's `validate_scenario`. |
 
-## Builder CLI (no Unity required)
-
-`Builder~/` is a plain dotnet console app compiled from this package's Runtime
-sources — the `~` suffix hides it from the Unity importer, so the same package
-ships the Unity library **and** an editor-independent command-line tool
-(.NET SDK 8+):
-
-```bash
-dotnet run --project Builder~ -- md2json  flow.md       -o scenario.json
-dotnet run --project Builder~ -- json2md  scenario.json -o flow.md
-dotnet run --project Builder~ -- csv2md   steps.csv     -o flow.md --name "Line 4"
-dotnet run --project Builder~ -- csv2json steps.csv     -o scenario.json --config --confidence 0.5
-```
-
-Same commands, flags, exit codes and (byte-identical) output as the Python
-port's `builder.py`. Every conversion prints the validation report to stderr;
-exit 2 means errors and nothing was written.
+> **Authoring tooling lives in the Python export** — mermaid-diagram and CSV
+> conversion is the `builder.py` CLI in
+> `com.ethar.trainingstatemachine.python` (one tool by design; scenario JSON
+> is the interchange this package parses). See
+> `V2/Documentation/Training-Builder.md`.
 
 ## Usage
 

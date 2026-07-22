@@ -146,7 +146,7 @@ The machine interprets **only** `waitingClass`, `result`, `options` (count),
 | Class arrivals — server | Host ingress | `DetectionService` (WebRTC data channel) | Type a class in `console.py` |
 | Class arrivals — action press | Host ingress | `TrainingResponseMessage` → same channel parser (`frame -1`) | `press [n]` in `console.py` |
 | Class arrivals — AprilTag | Host ingress | `TagDetectionBridgeService` (43) → `IDetectionService.PublishLocal` (`frame -2`); registry `TagDefinition.ClassName` maps tag id → class token | n/a (tags are on-device) |
-| Authoring | Host | `TrainingScenarioAsset` (ScriptableObject) + inspector with live chain validation + JSON/Markdown/CSV import & export ([Training-Builder.md](Training-Builder.md)) | Mermaid/CSV/JSON via the `builder.py` CLI ([Training-Builder.md](Training-Builder.md)) |
+| Authoring | Host | `TrainingScenarioAsset` (ScriptableObject) + inspector with live chain validation + JSON import/export — mermaid/CSV authoring happens in the Python builder and lands here as JSON ([Training-Builder.md](Training-Builder.md)) | **The** conversion tool: mermaid/CSV/JSON via the `builder.py` CLI ([Training-Builder.md](Training-Builder.md)) |
 | Graph validation (unreachable / dead-end / early-completion) | **Core** (both packages) | `TrainingScenarioValidator` (inspector + builder) | `validate_scenario` (builder CLI report) |
 
 **Offline capability (Unity host):** with `bridgeTagsToDetections` enabled and
@@ -188,8 +188,8 @@ No demo step sets `modelRef` — it defaults to empty everywhere.
 | **Tag-aligned models** | `modelRef` | ✅ | ✅ (data only — no scene host) | both (round-trip) |
 | Case-insensitive class match | — | ✅ | ✅ | both |
 | Graph validation (`TrainingScenarioValidator` / `validate_scenario`) | — | ✅ | ✅ | both |
-| **Mermaid builder** (markdown ⇄ config, shared dialect) | — | ✅ (`TrainingMermaidBuilder` + inspector buttons + `Builder~` dotnet CLI) | ✅ (`mermaid.py` + `builder.py` CLI) | both (round-trip; CLI outputs byte-identical) |
-| **CSV import** (spreadsheet → config, `;`-separated options) | — | ✅ (`TrainingCsvBuilder` + inspector button + CLI) | ✅ (`csv_io.py` + CLI) | both |
+| **Mermaid builder** (markdown ⇄ config, [Training-Builder.md](Training-Builder.md)) | — | — *(by design: JSON is the interchange; asset Import/Export JSON)* | ✅ **the** tool (`mermaid.py` + `builder.py` CLI) | Python (round-trip) |
+| **CSV import** (spreadsheet → config, `;`-separated options) | — | — *(by design, as above)* | ✅ (`csv_io.py` + CLI) | Python |
 
 Cross-references: [Training-Flow.md](Training-Flow.md) (the Unity client's
 end-to-end flow and UX), the package READMEs

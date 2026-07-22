@@ -22,11 +22,12 @@
   freeze at last pose on tag loss, self-healing on re-entry). Delineation:
   tags detect → bridge translates → engine decides → placement instantiates.
 
-- **Training builder in the scenario inspector.** `TrainingScenarioAsset` now
-  offers Import Markdown… / Export Markdown… / Import CSV… alongside the JSON
-  buttons — mermaid-diagram authoring and spreadsheet import through the
-  shared builder in `com.ethar.trainingstatemachine`, with the validation
-  report shown on every conversion (`Documentation/Training-Builder.md`).
+- **Scenario inspector validation now runs the shared core validator**
+  (`TrainingScenarioValidator` from `com.ethar.trainingstatemachine`) instead
+  of a private duplicate — the same checks the Python training builder prints
+  in its CLI report. Mermaid/CSV authoring is the Python builder
+  (`Documentation/Training-Builder.md`); scenario JSON remains the
+  interchange through the inspector's Import/Export JSON buttons.
 
 - **Breaking: training state machine extracted to `com.ethar.trainingstatemachine`**.
   `TrainingStateMachine`, `TrainingScenario`/`TrainingStep`,

@@ -29,9 +29,11 @@ tests/                    unittest suite (valid / ignore / result processing / b
 
 ## Training builder
 
-Author scenarios as mermaid diagrams and convert both ways, or import from a
-spreadsheet CSV — every conversion prints a validation report (dialect and
-usage: `V2/Documentation/Training-Builder.md`):
+**This is THE conversion tool for the project** (one implementation by
+design). Author scenarios as mermaid diagrams and convert both ways, or
+import from a spreadsheet CSV — every conversion prints a validation report;
+the resulting scenario JSON is what the Unity asset imports/exports (dialect
+and usage: `V2/Documentation/Training-Builder.md`):
 
 ```bash
 python builder.py md2json  flow.md       -o scenario.json

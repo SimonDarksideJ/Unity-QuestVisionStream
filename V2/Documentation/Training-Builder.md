@@ -4,49 +4,46 @@ Visual authoring for training scenarios: **the mermaid diagram IS the
 configuration**. Draw the flow in a markdown document, convert it to the
 training configuration; or take any existing configuration and generate the
 diagram back for review. A CSV path accelerates imports from spreadsheets.
-Every conversion runs the shared **validation report** (errors, warnings,
-info) so a broken chain is caught at the desk, not on the headset.
+Every conversion runs a **validation report** (errors, warnings, info) so a
+broken chain is caught at the desk, not on the headset.
 
-The builder exists in **both** implementations (the dialect and behaviour are
-identical — see the parity policy in
-[Training-Configuration-Reference.md](Training-Configuration-Reference.md)):
-
-| Surface | Where | Conversions |
-|---|---|---|
-| **C# CLI** (`dotnet`, no Unity) | `com.ethar.trainingstatemachine/Builder~/` — a plain dotnet console app compiled from the package's Runtime sources; the `~` suffix hides the folder from the Unity importer | `md2json`, `json2md`, `csv2md`, `csv2json` |
-| **Python CLI** | `com.ethar.trainingstatemachine.python/builder.py` | `md2json`, `json2md`, `csv2md`, `csv2json` |
-| **Unity inspector** | `TrainingScenarioAsset` inspector buttons (`com.questvisionstream.unity` Editor) | Import Markdown… / Export Markdown… / Import CSV… (plus the existing JSON import/export) — operates directly on the ScriptableObject |
-| **Library APIs** | C# `TrainingMermaidBuilder` / `TrainingCsvBuilder` / `TrainingScenarioValidator`; Python `try_parse_markdown` / `to_markdown` / `try_parse_csv` / `validate_scenario` | embed in your own tooling |
-
-**Both CLIs are editor-independent VS Code tools** — the C# one runs the very
-same `Ethar.Training` sources the Unity package ships (`noEngineReferences`
-pure C#), so a scenario built at the terminal is bit-for-bit what the headset
-loads. The two CLIs take the same commands, flags and exit codes, and their
-outputs are verified **byte-identical** for the same input.
+**There is ONE conversion tool — the Python builder CLI** — deliberately, so
+the dialect has a single implementation and nothing to drift against. It is an
+editor-independent VS Code tool (Python 3.8+, stdlib only, no Unity, no build
+step). **Scenario JSON is the interchange format**: the Unity
+`TrainingScenarioAsset` inspector imports/exports exactly that JSON, and the
+C# runtime loads it — so the builder output is bit-for-bit what the headset
+runs.
 
 ```bash
-# C# CLI — .NET SDK 8+, no Unity. Run from V2/ (or anywhere, adjust the path):
-dotnet run --project com.ethar.trainingstatemachine/Builder~ -- md2json  flow.md       -o scenario.json
-dotnet run --project com.ethar.trainingstatemachine/Builder~ -- json2md  scenario.json -o flow.md
-dotnet run --project com.ethar.trainingstatemachine/Builder~ -- csv2md   steps.csv     -o flow.md --name "Line 4 Training"
-dotnet run --project com.ethar.trainingstatemachine/Builder~ -- csv2json steps.csv     -o scenario.json --config --confidence 0.5
-# One-time: `dotnet build com.ethar.trainingstatemachine/Builder~` then run the
-# produced `ethar-training-builder` binary directly.
+cd V2/com.ethar.trainingstatemachine.python
 
-# Python CLI — Python 3.8+, stdlib only. Run from the python package folder:
 python builder.py md2json  flow.md       -o scenario.json        # diagram → wire format
 python builder.py json2md  scenario.json -o flow.md              # wire format → diagram
 python builder.py csv2md   steps.csv     -o flow.md --name "Line 4 Training"
 python builder.py csv2json steps.csv     -o scenario.json --config --confidence 0.5
 
-# Both: exit 0 = OK (warnings allowed), 2 = validation errors (nothing written);
-# the validation report prints to stderr.
+# Exit codes: 0 = OK (warnings allowed), 2 = validation errors (nothing written).
+# The validation report prints to stderr.
 ```
 
+### The Unity round trip (JSON is the seam)
+
+| Direction | Flow |
+|---|---|
+| **Author → headset** | write `flow.md` (any mermaid-rendering editor: VS Code, GitHub, Obsidian) → `builder.py md2json flow.md -o scenario.json` → **Import JSON…** on the `TrainingScenarioAsset` inspector (or assign at runtime via `ITrainingStateService.LoadScenarioJson`) |
+| **Unity asset → diagram** | **Export JSON…** on the asset inspector → `builder.py json2md scenario.json -o flow.md` → review the rendered diagram |
+| **Spreadsheet → headset** | `builder.py csv2md steps.csv -o flow.md` → *review the diagram* → `md2json` (or straight `csv2json`) → Import JSON… |
+
+The inspector shows the **same chain validation live** (the shared
+`TrainingScenarioValidator` in the C# package mirrors the builder's
+`validate_scenario` — the one deliberate piece of C#/Python twinning, because
+both sides need to judge a scenario). Library APIs for embedding in other
+tooling: Python `try_parse_markdown` / `to_markdown` / `try_parse_csv` /
+`validate_scenario`.
+
 `examples/ethar_demo.md` in the Python package is the demo scenario generated
-by the builder — a working sample of everything below. The C# package's test
-suite also runs headless (`dotnet test` against the Runtime + Tests sources),
-so builder changes can be verified entirely from the terminal on both sides.
+by the builder — a working sample of everything below.
 
 ---
 
@@ -146,9 +143,8 @@ finishtraining,Complete,Training complete,End,,,camera,,
 
 ## The validation report
 
-Every conversion ends with the shared chain validator
-(`TrainingScenarioValidator` / `validate_scenario`) — the same checks the
-Unity inspector shows live:
+Every conversion ends with the chain validator (`validate_scenario`; mirrored
+as `TrainingScenarioValidator` for the Unity inspector's live checks):
 
 | Level | Examples |
 |---|---|
@@ -158,10 +154,11 @@ Unity inspector shows live:
 
 ## Round-trip guarantee
 
-`config → markdown → config` is lossless (pinned by tests in both languages,
-including `modelRef` and pass-through steps). `markdown → config → markdown`
-normalizes node ids to `s1…sN` and always writes explicit `@result` tokens —
-semantically identical, textually canonical.
+`config → markdown → config` is lossless (pinned by the builder test suite,
+including `modelRef`, pass-through steps and empty-title+description).
+`markdown → config → markdown` normalizes node ids to `s1…sN` and always
+writes explicit `@result` tokens — semantically identical, textually
+canonical.
 
 Cross-references: [Training-Configuration-Reference.md](Training-Configuration-Reference.md)
 (the wire format the builder targets), [Training-Flow.md](Training-Flow.md)
