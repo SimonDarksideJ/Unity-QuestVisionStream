@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `IDetectionRendererService.RenderingEnabled` — master visibility switch for
+  the debug drawing: when false, incoming batches are ignored and the active
+  module's visuals are cleared, while the module selection is kept so
+  re-enabling resumes on the next batch. Hosts bind this to their debug
+  toggle (the Quest client binds it — with the HUD window and connection dot
+  — to the left controller MENU button, off by default).
+
 ## [1.0.0-pre.1]
 
 - Initial extraction from the QuestVisionStream V2 Unity client

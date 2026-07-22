@@ -8,7 +8,7 @@ diagram live) and convert back into the configuration the headset runs.
 | Document | Source | Runs as |
 |---|---|---|
 | [EtharTrainingScenario.md](EtharTrainingScenario.md) | Generated from the Unity app's shipped `Assets/QuestVisionStream/Resources/EtharTrainingScenario.asset` | The default demo scenario |
-| [EtharTrainingScenario-Extended.md](EtharTrainingScenario-Extended.md) | Hand-authored: the demo flow plus UX confirmation steps (turn the TV on, person steps back) with labels retained across button presses | Candidate replacement flow (import when ready) |
+| [EtharTrainingScenario-Extended.md](EtharTrainingScenario-Extended.md) | Hand-authored: the demo flow plus UX confirmation steps (turn the TV on, person steps back) with labels retained across button presses | Shipped as `Resources/EtharTrainingScenarioExtended.asset` — assign it on **Bootstrap ▸ Training ▸ Training Scenario** to test |
 
 ## Edit → convert → deploy
 

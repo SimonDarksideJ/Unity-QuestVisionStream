@@ -37,6 +37,16 @@ ITrainingModelPlacementService (47) step modelRef → prefab aligned to its tag
 IStatusService (50)           status model → in-headset HUD + server uplink
 ```
 
+**Debug visuals are OFF by default** — the trainee sees only the training UX
+(warm-up card, step forms, hand menu) and the world labels. The **left
+controller MENU button** toggles the debug set at runtime: the detection HUD
+log window, the drawn detection boxes (`IDetectionRendererService.RenderingEnabled`
+— visuals cleared on off, module selection kept) and the connection dot.
+`Bootstrap ▸ Debug ▸ Debug Visuals At Start` flips the default for
+development builds. With debug ON, the existing tuning inputs apply: X switches
+render modules, B toggles anchored-tag behaviour, Y+stick tunes pitch
+compensation.
+
 `Assets/Scenes/QuestVisionStream.unity` contains the full working hierarchy:
 
 - **XR Origin › Camera Offset › Main Camera** — Camera (solid-colour clear,
