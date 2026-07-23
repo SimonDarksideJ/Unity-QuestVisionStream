@@ -25,18 +25,41 @@ namespace Ethar.UXTraining.Components
     /// World labels register themselves as obstacles via
     /// <see cref="RegisterObstacle"/> / <see cref="UnregisterObstacle"/>
     /// (inactive obstacles are ignored).
+    ///
+    /// Usable both ways: add it to a world-space window in the Inspector and
+    /// tune the serialized fields, or attach from code via <see cref="Attach"/>,
+    /// which configures it from the shared <see cref="UxSettings"/> (overriding
+    /// the Inspector values).
     /// </summary>
-    [AddComponentMenu("")]
+    [AddComponentMenu("Ethar/UX Training/Window Follower")]
     public sealed class WindowFollower : MonoBehaviour
     {
         private static readonly List<Transform> obstacles = new List<Transform>();
 
+        [SerializeField]
+        [Tooltip("Fixed = anchor when shown (call Reanchor) and stay put. HeadLocked = lazily smooth-follow the user's view, avoiding active world labels.")]
         private WindowPlacementMode mode = WindowPlacementMode.Fixed;
+
+        [SerializeField]
+        [Tooltip("How far in front of the user the window is placed, in meters.")]
         private float distanceMeters = 1.25f;
+
+        [SerializeField]
+        [Tooltip("Vertical offset from eye height, in meters.")]
         private float heightOffsetMeters;
+
+        [SerializeField]
+        [Tooltip("Smooth-follow response time in seconds (time constant of the lazy follow).")]
         private float followSeconds = 0.3f;
-        private float clearanceDegrees = 20f;
+
+        [SerializeField]
+        [Tooltip("Minimum angle in degrees kept between the window's view direction and any active world label.")]
+        private float clearanceDegrees = 25f;
+
+        [SerializeField]
+        [Tooltip("In Fixed mode, glide the window back in front of the user when it ends up behind them or far away.")]
         private bool autoRecover;
+
         private bool anchored;
         private bool recovering;
 
@@ -179,9 +202,11 @@ namespace Ethar.UXTraining.Components
                         continue;
                     }
 
-                    // Inside the label's cone — stop at the boundary, on the side
-                    // the window currently sits (falling back to the gaze side).
-                    var side = delta != 0f ? Mathf.Sign(delta) : CurrentSideOf(obstacleYaw, cameraPosition);
+                    // Inside the label's cone — stop at the boundary. The side is
+                    // the WINDOW's current side (not the gaze side), so the window
+                    // stays parked while the gaze sweeps across the label and only
+                    // crosses over once the gaze clears the far boundary.
+                    var side = CurrentSideOf(obstacleYaw, cameraPosition, fallback: delta);
                     desiredYaw = obstacleYaw + side * clearanceDegrees;
                 }
             }
@@ -190,18 +215,27 @@ namespace Ethar.UXTraining.Components
             return cameraPosition + direction * distanceMeters + Vector3.up * heightOffsetMeters;
         }
 
-        /// <summary>Which side of the obstacle the window is on right now (+1 right, -1 left).</summary>
-        private float CurrentSideOf(float obstacleYaw, Vector3 cameraPosition)
+        /// <summary>
+        /// Which side of the obstacle the window is on right now (+1 right,
+        /// -1 left). Degenerate poses fall back to the gaze side (the sign of
+        /// <paramref name="fallback"/>), then right.
+        /// </summary>
+        private float CurrentSideOf(float obstacleYaw, Vector3 cameraPosition, float fallback)
         {
             var toWindow = transform.position - cameraPosition;
             toWindow.y = 0f;
             if (toWindow.sqrMagnitude < 0.01f)
             {
-                return 1f;
+                return fallback != 0f ? Mathf.Sign(fallback) : 1f;
             }
 
             var windowYaw = Mathf.Atan2(toWindow.x, toWindow.z) * Mathf.Rad2Deg;
             var delta = Mathf.DeltaAngle(obstacleYaw, windowYaw);
+            if (delta == 0f)
+            {
+                return fallback != 0f ? Mathf.Sign(fallback) : 1f;
+            }
+
             return delta >= 0f ? 1f : -1f;
         }
 

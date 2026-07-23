@@ -50,8 +50,8 @@ namespace Ethar.UXTraining.Settings
         private float windowFollowSeconds = 0.3f;
 
         [SerializeField]
-        [Tooltip("Head-locked windows keep their view direction at least this many degrees away from any active world label — the window slides to a stop at the boundary and resumes when the user looks back.")]
-        private float labelClearanceDegrees = 20f;
+        [Tooltip("Head-locked windows keep their view direction at least this many degrees away from any active world label — the window slides to a stop at the boundary and resumes when the user looks back. 25° covers the form's and the scaled label pill's angular half-widths at their default distances.")]
+        private float labelClearanceDegrees = 25f;
 
         public float LabelScale { get => labelScale; set => labelScale = value; }
         public float LabelLineWidthMeters { get => labelLineWidthMeters; set => labelLineWidthMeters = value; }
