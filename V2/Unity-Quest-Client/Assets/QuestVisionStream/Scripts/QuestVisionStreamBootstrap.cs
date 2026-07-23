@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using Ethar.DebugDrawingBBox;
+using Ethar.UXTraining.Settings;
 using QuestVisionStream.Core;
 using QuestVisionStream.Services;
 using QuestVisionStream.Training;
@@ -71,6 +72,11 @@ namespace QuestVisionStream.Client
         [SerializeField]
         [Tooltip("Simple-mode alignment aid — pitches detection rays down to offset the passthrough camera mount (positive = boxes down). 11° is the on-device tuned value for arm's-length desk objects; hold Y + L-stick to re-tune live, or 0 to disable. A fixed-depth approximation; the depth/anchored mode is the accurate fix.")]
         private float cameraPitchCompensationDegrees = 11f;
+
+        [Header("UX")]
+        [SerializeField]
+        [Tooltip("UX tuning asset (Create → Ethar → UX Training → UX Settings): world label sizing, window placement mode (fixed / head-locked) and follow behaviour. Empty tries Resources/UxSettings, then the package defaults.")]
+        private UxSettings uxSettings;
 
         [Header("Debug")]
         [SerializeField]
@@ -198,10 +204,12 @@ namespace QuestVisionStream.Client
                     signalingService != null &&
                     serviceManager.TryGetService<ICameraStreamService>(out var cameraService))
                 {
+                    serviceManager.TryGetService<IUxSettingsService>(out var uxSettingsService);
                     var warmup = new GameObject("QVS_StartupFlow");
                     warmup.transform.SetParent(camera.transform, false);
                     warmup.AddComponent<StartupFlowController>()
-                        .Initialize(status, webrtcService, signalingService, cameraService);
+                        .Initialize(status, webrtcService, signalingService, cameraService,
+                            uxSettingsService?.Settings);
                 }
             }
 
@@ -440,6 +448,14 @@ namespace QuestVisionStream.Client
 
         private void RegisterServices()
         {
+            // --- UX settings (5) — registered first so every UX consumer can read
+            // the cached settings (the training presentation service takes it as a
+            // constructor dependency).
+            var uxSettingsProfile = ScriptableObject.CreateInstance<UxSettingsServiceProfile>();
+            uxSettingsProfile.Settings = uxSettings;
+            serviceManager.TryCreateAndRegisterService<IUxSettingsService>(
+                typeof(UxSettingsService), out _, "UX Settings", 5u, uxSettingsProfile);
+
             // --- Signaling (priority 10) ---
             var signalingProfile = ScriptableObject.CreateInstance<SignalingServiceProfile>();
             signalingProfile.RemoteConfigUrl = remoteConfigUrl;

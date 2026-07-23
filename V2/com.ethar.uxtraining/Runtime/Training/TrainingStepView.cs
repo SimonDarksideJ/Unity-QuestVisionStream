@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Ethar.UXTraining
 {
@@ -21,7 +22,8 @@ namespace Ethar.UXTraining
             string title,
             string description,
             IReadOnlyList<string> options,
-            string imageRef = "")
+            string imageRef = "",
+            Texture2D image = null)
         {
             StepIndex = stepIndex;
             StepCount = stepCount;
@@ -29,6 +31,7 @@ namespace Ethar.UXTraining
             Description = description ?? string.Empty;
             Options = options ?? Array.Empty<string>();
             ImageRef = imageRef ?? string.Empty;
+            Image = image;
         }
 
         /// <summary>0-based index of this step in the scenario.</summary>
@@ -46,8 +49,14 @@ namespace Ethar.UXTraining
         /// <summary>Action button labels; index 0 renders as the primary button.</summary>
         public IReadOnlyList<string> Options { get; }
 
-        /// <summary>Image reference shown in the form's placeholder (empty = no image block).</summary>
+        /// <summary>Opaque image reference from the scenario (the host resolves it to <see cref="Image"/>).</summary>
         public string ImageRef { get; }
+
+        /// <summary>
+        /// The host-resolved image for this step. The form's image area renders
+        /// only when this is set — an unresolved <see cref="ImageRef"/> shows nothing.
+        /// </summary>
+        public Texture2D Image { get; }
 
         /// <summary>A step with no title and no options is a pass-through: no form is shown.</summary>
         public bool HasPresentation => Title.Length > 0 || Options.Count > 0;

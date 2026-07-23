@@ -57,7 +57,7 @@ namespace Ethar.Training
         /// <summary>Text for the world label + connector placed at the detected box centre.</summary>
         public string Label { get; }
 
-        /// <summary>Client-side image reference for the form (a shared placeholder image for now).</summary>
+        /// <summary>Host-resolved image reference for the form (empty = no image area). Opaque to the machine.</summary>
         public string ImageRef { get; }
 
         /// <summary>

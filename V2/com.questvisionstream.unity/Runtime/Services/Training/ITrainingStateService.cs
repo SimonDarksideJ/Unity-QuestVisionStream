@@ -112,6 +112,15 @@ namespace QuestVisionStream.Services
         /// <summary>Detections discarded because they didn't match the expected state.</summary>
         long DiscardedCount { get; }
 
+        /// <summary>
+        /// Resources-relative root for the scenario's step images — a sub-folder
+        /// named after the configured scenario asset (a step's <c>imageRef</c>
+        /// resolves as <c>Resources/&lt;ImageBasePath&gt;/&lt;imageRef&gt;</c>).
+        /// Empty when the scenario has no known source (built-in demo, wire JSON),
+        /// in which case steps show no image area.
+        /// </summary>
+        string ImageBasePath { get; }
+
         /// <summary>Replace the scenario (resets the flow to idle).</summary>
         void LoadScenario(TrainingScenario scenario);
 
