@@ -65,7 +65,7 @@ Two accepted root shapes, parsed by `TrainingScenarioParser` (C#) /
 | `options` | `Options` | `options` | `[]` | Action button labels. Pressing **any** option emits the step's `result` (option label is audit-only). |
 | `detectedClass` | `DetectedClass` | `detected_class` | `""` | Class annotated in the world while the step is active; re-sightings fire `CurrentClassSighted`/`current_class_sighted`. Also the **model alignment target** (see `modelRef`). |
 | `label` | `Label` | `label` | `""` | World label text at the detected box centre. `HasWorldLabel`/`has_world_label` = `detectedClass` and `label` both set. |
-| `imageRef` | `ImageRef` | `image_ref` | `""` | Host-resolved image reference for the form. Opaque to the machine. |
+| `imageRef` | `ImageRef` | `image_ref` | `""` | Host-resolved image reference for the form. Opaque to the machine. The Unity host resolves it relative to the scenario configuration: a texture in a Resources sub-folder named after the scenario asset (e.g. `Resources/EtharTrainingScenario/monitor.png` for `imageRef: "monitor.png"` — extension optional). The form's image area renders **only** when the image resolves. |
 | `modelRef` | `ModelRef` | `model_ref` | `""` | Host-resolved **model catalog key**: while the step is active the host's placement layer spawns the mapped model aligned to the physical marker (AprilTag) whose class name matches `detectedClass` (falling back to `waitingClass`). Opaque to the machine. `HasModel`/`has_model` = non-empty. |
 | `result` | `Result` | `result` | `""` | **The next expected class** — should equal a later step's `waitingClass` (the chain rule). Empty = final step: its action completes the scenario. |
 
@@ -140,7 +140,7 @@ The machine interprets **only** `waitingClass`, `result`, `options` (count),
 | Concern | Owner | Unity host (current) | Python host (current) |
 |---|---|---|---|
 | Step forms / hand menu | Host presentation | `TrainingPresentationService` + `com.ethar.uxtraining` | `console.py` prints step + options |
-| `imageRef` resolution | Host | Shared placeholder image | Ignored |
+| `imageRef` resolution | Host | Texture from `Resources/<scenario asset name>/<imageRef>`; image area hidden when unresolved | Ignored |
 | `modelRef` resolution + spawn | Host placement | `TrainingModelPlacementService` (47): model catalog → prefab aligned to the step's AprilTag, kept aligned by `TagPoseFollower` (smoothed follow, freeze on tag loss) | Ignored (no scene) |
 | World labels (`detectedClass` + `label`) | Host | Capture-pose unprojection at the detected box centre | Ignored |
 | Class arrivals — server | Host ingress | `DetectionService` (WebRTC data channel) | Type a class in `console.py` |

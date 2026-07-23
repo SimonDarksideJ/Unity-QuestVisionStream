@@ -93,6 +93,9 @@ namespace QuestVisionStream.Services
         public long DiscardedCount => machine.DiscardedCount;
 
         /// <inheritdoc />
+        public string ImageBasePath { get; private set; } = string.Empty;
+
+        /// <inheritdoc />
         public override void Start()
         {
             base.Start();
@@ -264,6 +267,12 @@ namespace QuestVisionStream.Services
             {
                 Debug.LogWarning($"[QVS:Training] '{profile.Scenario.name}' has no steps — falling back to the built-in demo scenario");
             }
+
+            // Step images live in a Resources sub-folder named after the scenario
+            // asset (empty for the built-in demo fallback — no images).
+            ImageBasePath = profile.Scenario != null && profile.Scenario.Steps.Count > 0
+                ? profile.Scenario.name
+                : string.Empty;
 
             // ScriptableObject profile → serializable config struct → machine.
             machine.Initialize(profile.ToConfig());

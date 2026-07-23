@@ -3,7 +3,8 @@
     "rootNamespace": "Ethar.UXTraining",
     "references": [
         "UnityEngine.UI",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "RealityCollective.ServiceFramework"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -35,7 +35,7 @@ namespace QuestVisionStream.Training
         [Tooltip("Text for the world label + connector placed at the detected box centre.")]
         public string label = string.Empty;
 
-        [Tooltip("Client-side image reference for the form (a shared placeholder image for now).")]
+        [Tooltip("Image shown in the form's image area — a texture in a Resources sub-folder named after this scenario asset (e.g. Resources/EtharTrainingScenario/monitor.png; extension optional). Empty, or unresolved, shows no image area.")]
         public string imageRef = string.Empty;
 
         [Tooltip("The next expected class — a later step's Waiting Class, arriving as a real detection or as this step's action result. Empty on the final step: pressing its action completes the scenario.")]

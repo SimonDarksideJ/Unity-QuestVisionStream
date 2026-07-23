@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using Ethar.UXTraining.Components;
 using Ethar.UXTraining.Interaction;
+using Ethar.UXTraining.Settings;
 using Ethar.UXTraining.Theme;
 using Ethar.UXTraining.UI;
 using UnityEngine;
@@ -17,8 +18,10 @@ namespace Ethar.UXTraining
     /// The training UX, built from the Ethar UX Training kit:
     ///
     ///   - <b>Display menu</b> — a world-space step form (eyebrow, progress ticks,
-    ///     title, description, image placeholder, action buttons) re-anchored in
-    ///     front of the user on every step. Rebuilt per step, focus-card style.
+    ///     title, description, optional step image, action buttons), placed by a
+    ///     <see cref="WindowFollower"/>: anchored in front of the user per step
+    ///     (Fixed) or label-aware smooth-following (HeadLocked), per the shared
+    ///     <see cref="UxSettings"/>. Rebuilt per step, focus-card style.
     ///   - <b>Hand menu</b> — the vertical 1d strip with a live current-step
     ///     readout, lazily following the off-hand controller and shown only in the
     ///     palm-up pose (fades in when the palm rolls toward the face, out when
@@ -36,7 +39,6 @@ namespace Ethar.UXTraining
     public sealed class TrainingUxController : MonoBehaviour
     {
         private const float FormPixelsToMetres = 0.0011f;
-        private const float LabelPixelsToMetres = 0.001f;
         private const float MenuPixelsToMetres = 0.0005f; // hand menu at 50% — full size read too big on the wrist
         private const float LabelLiftMeters = 0.16f;
         private const float MenuFollowSeconds = 0.25f;
@@ -48,12 +50,14 @@ namespace Ethar.UXTraining
         private const float MenuHideBelowDot = 0.35f;
 
         private ThemePalette theme;
+        private UxSettings settings;
         private Action<int> onOptionPressed;
         private UIFactory factory;
         private string brandText = "TRAINING";
 
         // Display menu (step form).
         private GameObject formRoot;
+        private WindowFollower formFollower;
         private Canvas formCanvas;
         private Canvas menuCanvas;
         private RectTransform formCanvasRect;
@@ -85,10 +89,12 @@ namespace Ethar.UXTraining
         /// <param name="optionPressed">Invoked with the option index when an action button is pressed.</param>
         /// <param name="menuActions">Handlers for the hand menu tiles.</param>
         /// <param name="brand">Eyebrow text on the form's top-right (e.g. the product/course name).</param>
+        /// <param name="uxSettings">Shared UX tuning (label sizing, window placement). Null uses <see cref="UxSettings.Defaults"/>.</param>
         public void Initialize(ThemePalette palette, float formDistance, Action<int> optionPressed,
-            HandMenu.Actions menuActions, string brand = "TRAINING")
+            HandMenu.Actions menuActions, string brand = "TRAINING", UxSettings uxSettings = null)
         {
             theme = palette;
+            settings = uxSettings != null ? uxSettings : UxSettings.Defaults;
             formDistanceMeters = formDistance;
             onOptionPressed = optionPressed;
             brandText = brand ?? string.Empty;
@@ -110,6 +116,7 @@ namespace Ethar.UXTraining
         {
             menuHandPositionAction?.Dispose();
             menuHandRotationAction?.Dispose();
+            WindowFollower.UnregisterObstacle(hintLabelCanvas);
 
             if (hintMaterial != null)
             {
@@ -140,7 +147,7 @@ namespace Ethar.UXTraining
 
             RebuildFormContent(step);
             formRoot.SetActive(true);
-            AnchorInFront(formRoot.transform, formDistanceMeters, heightOffset: -0.04f);
+            formFollower.Reanchor();
         }
 
         /// <summary>Re-anchor the current form in front of the user (hand menu TASKS).</summary>
@@ -148,7 +155,7 @@ namespace Ethar.UXTraining
         {
             if (IsFormVisible)
             {
-                AnchorInFront(formRoot.transform, formDistanceMeters, heightOffset: -0.04f);
+                formFollower.Reanchor();
             }
         }
 
@@ -171,6 +178,10 @@ namespace Ethar.UXTraining
             formCanvasRect = (RectTransform)formRoot.transform;
             formCanvasRect.sizeDelta = new Vector2(520, 700);
             formRoot.transform.localScale = Vector3.one * FormPixelsToMetres;
+
+            // Fixed or head-locked per the shared UX settings; head-locked keeps
+            // clear of any active world label (sliding-door stop at the boundary).
+            formFollower = WindowFollower.Attach(formRoot, settings, formDistanceMeters, heightOffsetMeters: -0.04f);
         }
 
         private void RebuildFormContent(TrainingStepView step)
@@ -224,15 +235,28 @@ namespace Ethar.UXTraining
                 f.Label(panel, step.Description, 15, T.textMid);
             }
 
-            // Image placeholder — the shared client-side "camera on a grey backdrop".
-            if (step.ImageRef.Length > 0)
+            // Step image — rendered only when the scenario provides one and the
+            // host resolved it (no image, no block: the grey area never shows empty).
+            if (step.Image != null)
             {
-                var image = f.Plate(panel, 12, new Color(0.35f, 0.37f, 0.40f, 0.95f), T.Overlay(0.18f), "ImagePlaceholder");
-                f.Sized(image, h: 130);
-                var glyph = f.Label(image, "📷", 44, new Color(0.9f, 0.92f, 0.94f), FontStyle.Normal, TextAnchor.MiddleCenter, wrap: false);
-                UIFactory.Stretch(glyph.rectTransform);
-                var caption = f.Label(image, step.ImageRef, 11, new Color(0.82f, 0.84f, 0.87f), FontStyle.Normal, TextAnchor.LowerRight, wrap: false);
-                UIFactory.Stretch(caption.rectTransform, 8f);
+                var plate = f.Plate(panel, 12, new Color(0.35f, 0.37f, 0.40f, 0.95f), T.Overlay(0.18f), "StepImage");
+                var aspect = step.Image.height > 0 ? (float)step.Image.width / step.Image.height : 1f;
+                // Inner width is the panel minus its padding; size the plate so the
+                // photo fills it (letterboxed by the fitter), within sane bounds.
+                const float innerWidth = 520f - 26f * 2f - 8f * 2f;
+                f.Sized(plate, h: Mathf.Clamp(innerWidth / aspect + 16f, 90f, 260f));
+
+                // Padded holder keeps the plate's rounded border visible; the
+                // fitter letterboxes the photo inside it at its native aspect.
+                var holder = f.Rect("PhotoHolder", plate);
+                UIFactory.Stretch(holder, 8f);
+                var photo = f.Rect("Photo", holder);
+                var raw = photo.gameObject.AddComponent<RawImage>();
+                raw.texture = step.Image;
+                raw.raycastTarget = false;
+                var fitter = photo.gameObject.AddComponent<AspectRatioFitter>();
+                fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                fitter.aspectRatio = aspect;
             }
 
             // Actions — default one; the first renders as the primary button.
@@ -296,6 +320,8 @@ namespace Ethar.UXTraining
 
             hintRoot.SetActive(true);
             hintLabelText.text = labelText;
+            // Head-locked windows must keep clear of the label while it shows.
+            WindowFollower.RegisterObstacle(hintLabelCanvas);
             UpdateWorldLabel(worldPoint);
         }
 
@@ -310,7 +336,9 @@ namespace Ethar.UXTraining
             hintMarker.position = worldPoint;
             hintLabelCanvas.position = worldPoint + Vector3.up * LabelLiftMeters;
             hintLine.SetPosition(0, worldPoint);
-            hintLine.SetPosition(1, hintLabelCanvas.position + Vector3.down * 0.028f);
+            // Attach the connector to the pill's bottom edge (half its scaled height).
+            var pillHalfHeight = hintLabelCanvas.sizeDelta.y * 0.5f * settings.LabelScale;
+            hintLine.SetPosition(1, hintLabelCanvas.position + Vector3.down * pillHalfHeight);
         }
 
         public void HideWorldLabel()
@@ -318,6 +346,7 @@ namespace Ethar.UXTraining
             if (hintRoot != null)
             {
                 hintRoot.SetActive(false);
+                WindowFollower.UnregisterObstacle(hintLabelCanvas);
             }
         }
 
@@ -352,7 +381,7 @@ namespace Ethar.UXTraining
             marker.name = "Marker";
             Destroy(marker.GetComponent<Collider>());
             marker.transform.SetParent(hintRoot.transform, false);
-            marker.transform.localScale = Vector3.one * 0.028f;
+            marker.transform.localScale = Vector3.one * settings.LabelDotDiameterMeters;
             var markerRenderer = marker.GetComponent<MeshRenderer>();
             markerRenderer.sharedMaterial = hintMaterial;
             hintMaterial.color = theme.accent;
@@ -367,8 +396,8 @@ namespace Ethar.UXTraining
             hintLine.material = hintLineMaterial;
             hintLine.startColor = theme.AccentA(0.85f);
             hintLine.endColor = theme.AccentA(0.85f);
-            hintLine.startWidth = 0.004f;
-            hintLine.endWidth = 0.004f;
+            hintLine.startWidth = settings.LabelLineWidthMeters;
+            hintLine.endWidth = settings.LabelLineWidthMeters;
             hintLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             hintLine.receiveShadows = false;
 
@@ -379,7 +408,7 @@ namespace Ethar.UXTraining
             canvas.renderMode = RenderMode.WorldSpace;
             hintLabelCanvas = (RectTransform)canvasObject.transform;
             hintLabelCanvas.sizeDelta = new Vector2(280, 56);
-            canvasObject.transform.localScale = Vector3.one * LabelPixelsToMetres;
+            canvasObject.transform.localScale = Vector3.one * settings.LabelScale;
 
             var pill = factory.Plate(hintLabelCanvas, 16, theme.Panel(), theme.HintBorder(), "Pill");
             UIFactory.Stretch(pill);
@@ -390,16 +419,17 @@ namespace Ethar.UXTraining
         private IEnumerator PulseMarker()
         {
             const float duration = 1.6f;
+            var dot = settings.LabelDotDiameterMeters;
             var elapsed = 0f;
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 var tri = 1f - Mathf.Abs(2f * ((elapsed / 0.8f) % 1f) - 1f);
-                hintMarker.localScale = Vector3.one * Mathf.Lerp(0.028f, 0.048f, tri);
+                hintMarker.localScale = Vector3.one * Mathf.Lerp(dot, dot * 1.7f, tri);
                 yield return null;
             }
 
-            hintMarker.localScale = Vector3.one * 0.028f;
+            hintMarker.localScale = Vector3.one * dot;
             hintPulse = null;
         }
 
@@ -483,23 +513,6 @@ namespace Ethar.UXTraining
             }
 
             menuRoot.transform.rotation = Quaternion.LookRotation(menuRoot.transform.position - camera.transform.position);
-        }
-
-        private void AnchorInFront(Transform panel, float distance, float heightOffset)
-        {
-            var camera = Camera.main;
-            if (camera == null)
-            {
-                return;
-            }
-
-            var forward = camera.transform.forward;
-            forward.y = 0f;
-            forward = forward.sqrMagnitude < 0.001f ? Vector3.forward : forward.normalized;
-
-            var position = camera.transform.position + forward * distance + Vector3.up * heightOffset;
-            panel.position = position;
-            panel.rotation = Quaternion.LookRotation(position - camera.transform.position);
         }
     }
 }

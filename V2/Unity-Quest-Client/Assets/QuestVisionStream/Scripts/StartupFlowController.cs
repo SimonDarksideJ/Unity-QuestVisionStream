@@ -1,7 +1,10 @@
 // Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
+using Ethar.UXTraining.Components;
 using Ethar.UXTraining.Interaction;
+using Ethar.UXTraining.Settings;
+using Ethar.UXTraining.UI;
 using QuestVisionStream.Protocol;
 using QuestVisionStream.Services;
 using UnityEngine;
@@ -42,13 +45,21 @@ namespace QuestVisionStream.Client
         private static readonly Color ButtonDisabledText = new Color(0.68f, 0.71f, 0.77f);   // #aeb6c4
         private static readonly Color NoteColor = new Color(0.91f, 0.93f, 0.96f, 0.6f);
         private static readonly Color NoteErrorColor = new Color(1f, 0.42f, 0.42f);          // #ff6b6b
+        private static readonly Color CardBorderColor = new Color(1f, 1f, 1f, 0.14f);        // soft hairline, as the step form plates
+
+        // Uniform vertical padding: the title sits this far from the card's top
+        // edge, the button this far from its bottom edge.
+        private const float CardEdgePadding = 40f;
+        private const float CardDistanceMeters = 1.4f;
 
         private IStatusService status;
         private IWebRTCService webrtc;
         private ISignalingService signaling;
         private ICameraStreamService camera;
+        private UxSettings uxSettings;
 
         private GameObject introRoot;
+        private WindowFollower follower;
         private Text buttonText;
         private Image buttonImage;
         private Button buttonControl;
@@ -68,12 +79,14 @@ namespace QuestVisionStream.Client
             IStatusService statusService,
             IWebRTCService webrtcService,
             ISignalingService signalingService,
-            ICameraStreamService cameraService)
+            ICameraStreamService cameraService,
+            UxSettings settings = null)
         {
             status = statusService;
             webrtc = webrtcService;
             signaling = signalingService;
             camera = cameraService;
+            uxSettings = settings != null ? settings : UxSettings.Defaults;
 
             conn = signaling.IsConnected ? Conn.Connected : Conn.Connecting;
             signaling.Connected += OnSignalingConnected;
@@ -87,6 +100,13 @@ namespace QuestVisionStream.Client
 
         private void OnDestroy()
         {
+            // The card is a scene-root object (the follower owns its placement),
+            // so it does not die with this controller automatically.
+            if (introRoot != null)
+            {
+                Destroy(introRoot);
+            }
+
             if (signaling != null)
             {
                 signaling.Connected -= OnSignalingConnected;
@@ -258,9 +278,9 @@ namespace QuestVisionStream.Client
 
         private void BuildIntroCard()
         {
+            // A scene-root object: this controller hangs off the camera, but the
+            // card's placement (fixed or head-locked) belongs to the follower.
             introRoot = new GameObject("QVS_Intro");
-            introRoot.transform.SetParent(transform, false);
-            introRoot.transform.localPosition = new Vector3(0, 0, 1.4f);
 
             var canvas = introRoot.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
@@ -272,17 +292,20 @@ namespace QuestVisionStream.Client
             canvasRect.sizeDelta = new Vector2(620, 400);
             introRoot.transform.localScale = Vector3.one * 0.0012f;
 
-            var card = CreatePanel(canvasRect, "Card", CardColor);
+            // Rounded plate with the soft hairline border, matching the training
+            // step form's plates.
+            var card = CreatePanel(canvasRect, "Card", CardColor, radius: 18);
+            UIFactory.AddBorder(card.gameObject, CardBorderColor);
             Stretch(card, Vector2.zero, Vector2.zero);
 
             var title = CreateText(card, "Title", "Welcome to the Ethar\nTraining Demonstration", 42, FontStyle.Bold, TitleColor);
-            Place(title, new Vector2(0.5f, 1f), new Vector2(0, -95), new Vector2(560, 150));
+            Place(title, new Vector2(0.5f, 1f), new Vector2(0, -CardEdgePadding), new Vector2(560, 110));
 
             var sub = CreateText(card, "Sub", "Put on your headset and step into the experience.", 20, FontStyle.Normal, SubColor);
             Place(sub, new Vector2(0.5f, 1f), new Vector2(0, -190), new Vector2(560, 40));
 
-            var buttonObject = CreatePanel(card, "EnterButton", ButtonDisabledColor);
-            Place((RectTransform)buttonObject.transform, new Vector2(0.5f, 1f), new Vector2(0, -265), new Vector2(300, 70));
+            var buttonObject = CreatePanel(card, "EnterButton", ButtonDisabledColor, radius: 12);
+            Place((RectTransform)buttonObject.transform, new Vector2(0.5f, 0f), new Vector2(0, CardEdgePadding), new Vector2(300, 70));
             buttonImage = buttonObject.GetComponent<Image>();
             buttonControl = buttonObject.gameObject.AddComponent<Button>();
             buttonControl.targetGraphic = buttonImage;
@@ -304,18 +327,30 @@ namespace QuestVisionStream.Client
             buttonText = label.GetComponent<Text>();
 
             var note = CreateText(card, "Note", string.Empty, 17, FontStyle.Normal, NoteColor);
-            Place(note, new Vector2(0.5f, 1f), new Vector2(0, -335), new Vector2(560, 60));
+            Place(note, new Vector2(0.5f, 1f), new Vector2(0, -235), new Vector2(560, 50));
             noteText = note.GetComponent<Text>();
+
+            // Fixed or head-locked per the shared UX settings. autoRecover glides
+            // the card back into view if it anchored before tracking settled.
+            follower = WindowFollower.Attach(introRoot, uxSettings, CardDistanceMeters, autoRecover: true);
+            follower.Reanchor();
         }
 
         // ---- tiny uGUI helpers ----
 
-        private static RectTransform CreatePanel(RectTransform parent, string name, Color color)
+        private static RectTransform CreatePanel(RectTransform parent, string name, Color color, int radius = 0)
         {
             var panel = new GameObject(name, typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)panel.transform;
             rect.SetParent(parent, false);
-            panel.GetComponent<Image>().color = color;
+            var image = panel.GetComponent<Image>();
+            if (radius > 0)
+            {
+                image.sprite = RoundedSprite.Get(radius);
+                image.type = Image.Type.Sliced;
+            }
+
+            image.color = color;
             return rect;
         }
 

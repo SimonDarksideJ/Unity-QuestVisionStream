@@ -2,8 +2,10 @@
 // Licensed under the MIT License. See LICENSE in the repository root for license information.
 
 using System;
+using System.Collections.Generic;
 using Ethar.UXTraining;
 using Ethar.UXTraining.Components;
+using Ethar.UXTraining.Settings;
 using Ethar.UXTraining.Theme;
 using Ethar.Training;
 using QuestVisionStream.Services;
@@ -58,6 +60,8 @@ namespace QuestVisionStream.Client
         private readonly IDetectionService detections;
         private readonly IPoseTrackingService poseTracking;
         private readonly IWebRTCService webrtc;
+        private readonly IUxSettingsService uxSettings;
+        private readonly Dictionary<string, Texture2D> stepImageCache = new Dictionary<string, Texture2D>();
         private TrainingUxController controller;
 
         public TrainingPresentationService(
@@ -67,7 +71,8 @@ namespace QuestVisionStream.Client
             ITrainingStateService training,
             IDetectionService detections,
             IPoseTrackingService poseTracking,
-            IWebRTCService webrtc)
+            IWebRTCService webrtc,
+            IUxSettingsService uxSettings)
             : base(name, priority)
         {
             this.profile = profile != null ? profile : throw new ArgumentNullException(nameof(profile));
@@ -75,6 +80,7 @@ namespace QuestVisionStream.Client
             this.detections = detections ?? throw new ArgumentNullException(nameof(detections));
             this.poseTracking = poseTracking ?? throw new ArgumentNullException(nameof(poseTracking));
             this.webrtc = webrtc ?? throw new ArgumentNullException(nameof(webrtc));
+            this.uxSettings = uxSettings ?? throw new ArgumentNullException(nameof(uxSettings));
         }
 
         public bool IsFormVisible => controller != null && controller.IsFormVisible;
@@ -98,7 +104,8 @@ namespace QuestVisionStream.Client
                     redo = RestartScenario,
                     exit = ExitScenario
                 },
-                brand: "ETHAR TRAINING");
+                brand: "ETHAR TRAINING",
+                uxSettings: uxSettings.Settings);
             // The state service starts first (lower priority) — its ScenarioLoaded
             // fired before this subscription, so read the loaded scenario directly.
             controller.SetHandMenuStep("TRAINING", training.Scenario != null ? training.Scenario.Name : "Waiting…");
@@ -263,7 +270,7 @@ namespace QuestVisionStream.Client
         }
 
         /// <summary>Map a state-service step activation onto the package's presentation-only view.</summary>
-        private static TrainingStepView ToView(TrainingStepActivation activation)
+        private TrainingStepView ToView(TrainingStepActivation activation)
         {
             var step = activation.Step;
             return new TrainingStepView(
@@ -272,7 +279,42 @@ namespace QuestVisionStream.Client
                 step.Title,
                 step.Description,
                 step.Options,
-                step.ImageRef);
+                step.ImageRef,
+                ResolveStepImage(step.ImageRef));
+        }
+
+        /// <summary>
+        /// Resolve a step's image reference to a texture. Images live in a
+        /// Resources sub-folder named after the scenario configuration
+        /// (<see cref="ITrainingStateService.ImageBasePath"/>) — e.g. the
+        /// <c>EtharTrainingScenario</c> asset reads
+        /// <c>Resources/EtharTrainingScenario/&lt;imageRef&gt;</c>. Unresolvable
+        /// references return null, so the form shows no image area.
+        /// </summary>
+        private Texture2D ResolveStepImage(string imageRef)
+        {
+            if (string.IsNullOrEmpty(imageRef) || string.IsNullOrEmpty(training.ImageBasePath))
+            {
+                return null;
+            }
+
+            // Resources paths are extension-less — tolerate authored file names.
+            var withoutExtension = System.IO.Path.ChangeExtension(imageRef, null);
+            var path = $"{training.ImageBasePath}/{withoutExtension}";
+            if (stepImageCache.TryGetValue(path, out var cached))
+            {
+                return cached;
+            }
+
+            var texture = Resources.Load<Texture2D>(path);
+            if (texture == null)
+            {
+                Debug.Log($"[QVS:Training] no UX image at Resources/{path} — the step shows no image area");
+            }
+
+            // Cache misses too, so a missing file is probed (and logged) once.
+            stepImageCache[path] = texture;
+            return texture;
         }
 
         private bool TryGetWorldPoint(TrainingDetectionMatch match, out Vector3 worldPoint)

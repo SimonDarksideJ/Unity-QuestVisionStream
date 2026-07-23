@@ -11,11 +11,12 @@ mouse-testable in the Editor.
 
 | Area | Types | Purpose |
 | --- | --- | --- |
-| `Ethar.UXTraining` | `TrainingUxController`, `TrainingStepView` | The training UX: a world-space step form (eyebrow, progress ticks, title, description, image placeholder, action buttons), a palm-up hand menu with a live step readout, and a world **location indicator** (pulsing hotspot marker + leader line + billboarded label pill). |
+| `Ethar.UXTraining` | `TrainingUxController`, `TrainingStepView` | The training UX: a world-space step form (eyebrow, progress ticks, title, description, an image area shown only when the host resolves a step image, action buttons), a palm-up hand menu with a live step readout, and a world **location indicator** (pulsing hotspot marker + leader line + billboarded label pill). |
 | `Ethar.UXTraining.Interaction` | `XRUiPointer` | Pointer input + UX feedback for world-space canvases: an `InputSystemUIInputModule` configured in code, a laser clamped to the UI hit, and a surface-flattened reticle. Editor mouse works through the same module. |
 | `Ethar.UXTraining.Theme` | `ThemePalette`, `ThemeLibrary`, `ThemeManager` | ~12 core colour tokens per palette, everything else derived. Three built-ins: Dark·Cyan, Light·Teal, Hi-Vis·Orange. Author your own via *Create ▸ Ethar ▸ UX Training ▸ Theme Palette*. |
 | `Ethar.UXTraining.UI` | `UIFactory`, `RoundedSprite` | Terse, themed uGUI construction helpers and runtime-baked 9-sliced rounded sprites. |
-| `Ethar.UXTraining.Components` | `HandMenu`, `ButtonHoverGlow`, `Pulser` | The vertical hand-menu strip, pointer-hover glow feedback, and dot/ring pulse animations for hotspots and callouts. |
+| `Ethar.UXTraining.Components` | `HandMenu`, `ButtonHoverGlow`, `Pulser`, `WindowFollower` | The vertical hand-menu strip, pointer-hover glow feedback, dot/ring pulse animations, and window placement: `Fixed` (anchor in front of the user when shown) or `HeadLocked` (lazy smooth-follow that slides to a stop at a clearance boundary around active world labels and resumes when the user looks back). |
+| `Ethar.UXTraining.Settings` | `UxSettings`, `UxSettingsService` (+ `IUxSettingsService`, profile) | The kit's tuning asset — world label scale / leader-line width / placement-dot size, window placement mode and follow behaviour — cached at app start by a [RealityCollective Service Framework](https://github.com/realitycollective/com.realitycollective.service-framework) service (profile asset → `Resources/UxSettings` → built-in defaults). Author via *Create ▸ Ethar ▸ UX Training ▸ UX Settings*. |
 
 ## Quick start
 
@@ -85,3 +86,4 @@ Pico, HTC, …) these bindings resolve without modification.
 - Unity 6000.0+
 - `com.unity.inputsystem` (Active Input Handling set to Input System or Both)
 - `com.unity.ugui`
+- `com.realitycollective.service-framework` (for the `UxSettingsService`; via the OpenUPM scoped registry)
