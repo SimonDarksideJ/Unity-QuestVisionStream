@@ -19,7 +19,9 @@ runs.
 cd V2/com.ethar.trainingstatemachine.python
 
 python builder.py md2json  flow.md       -o scenario.json        # diagram → wire format
+python builder.py md2csv   flow.md       -o steps.csv            # diagram → spreadsheet
 python builder.py json2md  scenario.json -o flow.md              # wire format → diagram
+python builder.py json2csv scenario.json -o steps.csv            # wire format → spreadsheet
 python builder.py csv2md   steps.csv     -o flow.md --name "Line 4 Training"
 python builder.py csv2json steps.csv     -o scenario.json --config --confidence 0.5
 
@@ -34,13 +36,14 @@ python builder.py csv2json steps.csv     -o scenario.json --config --confidence 
 | **Author → headset** | write `flow.md` (any mermaid-rendering editor: VS Code, GitHub, Obsidian) → `builder.py md2json flow.md -o scenario.json` → **Import JSON…** on the `TrainingScenarioAsset` inspector (or assign at runtime via `ITrainingStateService.LoadScenarioJson`) |
 | **Unity asset → diagram** | **Export JSON…** on the asset inspector → `builder.py json2md scenario.json -o flow.md` → review the rendered diagram |
 | **Spreadsheet → headset** | `builder.py csv2md steps.csv -o flow.md` → *review the diagram* → `md2json` (or straight `csv2json`) → Import JSON… |
+| **Back to the spreadsheet** | `builder.py md2csv flow.md -o steps.csv` (or `json2csv` from an asset export) → open in Excel/Sheets — the export is the exact dialect the import reads |
 
 The inspector shows the **same chain validation live** (the shared
 `TrainingScenarioValidator` in the C# package mirrors the builder's
 `validate_scenario` — the one deliberate piece of C#/Python twinning, because
 both sides need to judge a scenario). Library APIs for embedding in other
 tooling: Python `try_parse_markdown` / `to_markdown` / `try_parse_csv` /
-`validate_scenario`.
+`to_csv` / `validate_scenario`.
 
 `examples/ethar_demo.md` in the Python package is the demo scenario generated
 by the builder — a working sample of everything below.
@@ -119,10 +122,12 @@ tokens must be single words.
 
 ---
 
-## CSV import (spreadsheet accelerator)
+## CSV import/export (spreadsheet accelerator)
 
-One header row + one row per step. Column matching is case-insensitive and
-ignores spaces/underscores (`Waiting Class` = `waiting_class` = `waitingClass`):
+One header row + one row per step. On import, column matching is
+case-insensitive and ignores spaces/underscores (`Waiting Class` =
+`waiting_class` = `waitingClass`); `md2csv`/`json2csv` export exactly this
+dialect with the canonical camelCase header:
 
 ```csv
 waitingClass,title,description,options,detectedClass,label,imageRef,modelRef,result
@@ -138,6 +143,8 @@ finishtraining,Complete,Training complete,End,,,camera,,
   delimiter). Quoted cells, embedded commas and newlines are handled.
 - Unknown columns are reported as **info** and ignored (spreadsheet leftovers
   are fine); a missing `waitingClass`/`result` column is a **warning**.
+- The CSV has **no scenario-name cell** — supply `--name` when importing
+  (round trips through CSV are otherwise lossless, pinned by the test suite).
 - Recommended flow: `csv2md` first, **review the rendered diagram**, then
   import/convert — the diagram is the verification step.
 

@@ -1,7 +1,7 @@
 # Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 # Licensed under the MIT License. See LICENSE in the repository root for license information.
 
-"""CSV import for the training builder — accelerates spreadsheet-based
+"""CSV import/export for the training builder — accelerates spreadsheet-based
 authoring (the demo scenario's heritage is a Training_Scenario.xlsx). One row
 per step, one column per step field; ``options`` are ``;``-separated inside
 their cell. A 1:1 behavioural twin of the C# ``TrainingCsvBuilder``."""
@@ -19,7 +19,34 @@ from .validation import ValidationReport, validate_scenario
 COLUMNS = ("waitingclass", "title", "description", "options",
            "detectedclass", "label", "imageref", "modelref", "result")
 
+#: Header row written by :func:`to_csv` — the camelCase spellings of COLUMNS,
+#: in the same order, matching the wire-format field names.
+HEADER = ("waitingClass", "title", "description", "options",
+          "detectedClass", "label", "imageRef", "modelRef", "result")
+
 OPTIONS_SEPARATOR = ";"
+
+
+def to_csv(scenario: TrainingScenario) -> str:
+    """Serialize a scenario to spreadsheet CSV — one row per step, the exact
+    dialect :func:`try_parse_csv` reads back (scenario name excepted: CSV has
+    no name cell, so exports round-trip via ``--name``)."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(HEADER)
+    for step in scenario.steps:
+        writer.writerow((
+            step.waiting_class,
+            step.title,
+            step.description,
+            OPTIONS_SEPARATOR.join(step.options),
+            step.detected_class,
+            step.label,
+            step.image_ref,
+            step.model_ref,
+            step.result,
+        ))
+    return buffer.getvalue()
 
 
 def try_parse_csv(text: Optional[str], name: str = "") -> Tuple[bool, Optional[TrainingScenario], ValidationReport]:

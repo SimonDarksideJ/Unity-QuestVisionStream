@@ -7,10 +7,9 @@ The format is shared with the Unity packages, so these tests pin compatibility."
 import unittest
 
 from training_state_machine import (
-    TrainingStateMachine,
+    TrainingScenarioData,
+    TrainingStateMachineConfig,
     config_to_json,
-    ethar_demo,
-    ethar_demo_config,
     scenario_to_json,
     try_parse_config,
     try_parse_scenario,
@@ -98,7 +97,10 @@ class TrainingScenarioParserTests(unittest.TestCase):
         self.assertEqual(reparsed, scenario, "modelRef survives the round trip")
 
     def test_config_to_json_round_trips_the_config(self):
-        config = ethar_demo_config(0.65)
+        _, scenario = try_parse_scenario(SCENARIO_JSON)
+        config = TrainingStateMachineConfig(
+            scenario=TrainingScenarioData.from_scenario(scenario),
+            minimum_detection_confidence=0.65)
 
         text = config_to_json(config)
 
@@ -108,27 +110,14 @@ class TrainingScenarioParserTests(unittest.TestCase):
         self.assertEqual(reparsed.scenario.name, "Ethar Training Demo")
         self.assertEqual(len(reparsed.scenario.steps), 6)
         self.assertEqual(reparsed.scenario.steps[2].detected_class, "tv")
-
-        # And a machine initialized from the round-tripped config runs the flow.
-        machine = TrainingStateMachine(reparsed)
-        self.assertTrue(machine.begin())
-        self.assertEqual(machine.expected_class, "begintraining")
+        self.assertEqual(reparsed.scenario.to_scenario(), scenario,
+                         "the config wrapper preserves the scenario exactly")
 
     def test_parse_config_malformed_input_is_rejected(self):
         self.assertFalse(try_parse_config(None)[0])
         self.assertFalse(try_parse_config("not json")[0])
         self.assertFalse(try_parse_config("{}")[0], "no scenario")
         self.assertFalse(try_parse_config('{"scenario":{"steps":[]}}')[0], "empty steps")
-
-    def test_library_ethar_demo_matches_the_excel_flow(self):
-        demo = ethar_demo()
-
-        self.assertEqual(len(demo.steps), 6)
-        self.assertEqual(demo.steps[0].title, "Welcome")
-        self.assertEqual(demo.steps[1].result, "tv")
-        self.assertFalse(demo.steps[3].has_presentation)
-        self.assertEqual(demo.steps[4].detected_class, "person")
-        self.assertEqual(demo.steps[5].result, "")
 
 
 if __name__ == "__main__":

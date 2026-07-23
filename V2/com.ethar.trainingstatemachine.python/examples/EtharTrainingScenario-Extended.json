@@ -1,7 +1,7 @@
 {
   "minimumDetectionConfidence": 0.5,
   "scenario": {
-    "name": "Ethar Training Demo",
+    "name": "Ethar Training Demo \u2014 Extended",
     "steps": [
       {
         "waitingClass": "",
@@ -31,45 +31,60 @@
       },
       {
         "waitingClass": "tv",
-        "title": "Found TV",
-        "description": "You found the TV, can you now locate a person",
+        "title": "TV Found",
+        "description": "You found the TV - can you turn it on?",
+        "options": [
+          "It's On"
+        ],
+        "detectedClass": "tv",
+        "label": "This is a tv",
+        "imageRef": "camera",
+        "result": "tvon",
+        "modelRef": ""
+      },
+      {
+        "waitingClass": "tvon",
+        "title": "TV Is On",
+        "description": "Good - the TV is on. Next, find the person",
         "options": [
           "Next"
         ],
         "detectedClass": "tv",
         "label": "This is a tv",
         "imageRef": "camera",
-        "result": "foundtv",
-        "modelRef": ""
-      },
-      {
-        "waitingClass": "foundtv",
-        "title": "",
-        "description": "",
-        "options": [],
-        "detectedClass": "",
-        "label": "",
-        "imageRef": "",
         "result": "person",
         "modelRef": ""
       },
       {
         "waitingClass": "person",
-        "title": "Found Person",
-        "description": "You found a person",
+        "title": "Person Found",
+        "description": "You found a person - please ask them to step back",
         "options": [
-          "Finish"
+          "Stepped Back"
         ],
         "detectedClass": "person",
         "label": "This is a person",
         "imageRef": "camera",
-        "result": "finishtraining",
+        "result": "personback",
         "modelRef": ""
       },
       {
-        "waitingClass": "finishtraining",
-        "title": "Complete",
-        "description": "You have found everything and the course is complete",
+        "waitingClass": "personback",
+        "title": "Person Stepped Back",
+        "description": "Good - the person has stepped back",
+        "options": [
+          "Next"
+        ],
+        "detectedClass": "person",
+        "label": "This is a person",
+        "imageRef": "camera",
+        "result": "trainingdone",
+        "modelRef": ""
+      },
+      {
+        "waitingClass": "trainingdone",
+        "title": "Training Complete",
+        "description": "Thank you for completing your training",
         "options": [
           "End"
         ],

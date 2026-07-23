@@ -1,0 +1,7 @@
+waitingClass,title,description,options,detectedClass,label,imageRef,modelRef,result
+,Welcome,Ready to begin your Ethar training?,Begin,,,camera,,begintraining
+begintraining,Look for a Monitor,Search your space and locate the monitor,Search,,,camera,,tv
+tv,Found TV,"You found the TV, can you now locate a person",Next,tv,This is a tv,camera,,foundtv
+foundtv,,,,,,,,person
+person,Found Person,You found a person,Finish,person,This is a person,camera,,finishtraining
+finishtraining,Complete,You have found everything and the course is complete,End,,,camera,,

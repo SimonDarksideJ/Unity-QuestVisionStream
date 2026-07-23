@@ -189,7 +189,7 @@ No demo step sets `modelRef` — it defaults to empty everywhere.
 | Case-insensitive class match | — | ✅ | ✅ | both |
 | Graph validation (`TrainingScenarioValidator` / `validate_scenario`) | — | ✅ | ✅ | both |
 | **Mermaid builder** (markdown ⇄ config, [Training-Builder.md](Training-Builder.md)) | — | — *(by design: JSON is the interchange; asset Import/Export JSON)* | ✅ **the** tool (`mermaid.py` + `builder.py` CLI) | Python (round-trip) |
-| **CSV import** (spreadsheet → config, `;`-separated options) | — | — *(by design, as above)* | ✅ (`csv_io.py` + CLI) | Python |
+| **CSV import/export** (spreadsheet ⇄ config, `;`-separated options) | — | — *(by design, as above)* | ✅ (`csv_io.py` + CLI) | Python (round-trip) |
 
 Cross-references: [Training-Flow.md](Training-Flow.md) (the Unity client's
 end-to-end flow and UX), the package READMEs

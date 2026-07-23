@@ -9,7 +9,16 @@
         "com.realitycollective.service-framework": "2.0.0-pre.1",
         "com.realitycollective.utilities": "2.0.0-pre.1",
         "com.unity.xr.arfoundation": "6.5.0",
+        "com.unity.xr.core-utils": "2.5.1",
         "com.unity.ugui": "2.0.0"
+      }
+    },
+    "com.ethar.trainingstatemachine": {
+      "version": "file:../../com.ethar.trainingstatemachine",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
       }
     },
     "com.ethar.uxtraining": {
@@ -41,6 +50,7 @@
       "depth": 0,
       "source": "local",
       "dependencies": {
+        "com.ethar.trainingstatemachine": "1.0.0",
         "com.realitycollective.service-framework": "2.0.0-pre.1",
         "com.realitycollective.utilities": "2.0.0-pre.1",
         "com.utilities.websockets": "2.0.0",

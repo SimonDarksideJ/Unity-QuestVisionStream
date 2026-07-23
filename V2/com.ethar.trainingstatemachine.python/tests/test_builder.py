@@ -1,7 +1,7 @@
 # Copyright (c) Simon Jackson (SimonDarksideJ). All rights reserved.
 # Licensed under the MIT License. See LICENSE in the repository root for license information.
 
-"""Training builder — mermaid dialect, CSV import and validation report.
+"""Training builder — mermaid dialect, CSV import/export and validation report.
 Mirrors the C# TrainingBuilderTests; the dialect is shared, so these tests pin
 cross-language compatibility of the authoring format."""
 
@@ -9,7 +9,7 @@ import unittest
 
 from training_state_machine import (
     ValidationSeverity,
-    ethar_demo,
+    to_csv,
     to_markdown,
     try_parse_csv,
     try_parse_markdown,
@@ -37,6 +37,13 @@ flowchart TD
   done -->|End| END
 ```
 """
+
+
+def demo_scenario():
+    """The demo scenario, via the mermaid dialect — the diagram IS the data."""
+    ok, scenario, _, report = try_parse_markdown(DEMO_MARKDOWN)
+    assert ok, str(report)
+    return scenario
 
 
 class MermaidParseTests(unittest.TestCase):
@@ -121,7 +128,7 @@ class MermaidParseTests(unittest.TestCase):
 
 class MermaidRoundTripTests(unittest.TestCase):
     def test_demo_scenario_round_trips_through_markdown(self):
-        demo = ethar_demo()
+        demo = demo_scenario()
         markdown = to_markdown(demo, 0.5)
 
         ok, reparsed, confidence, report = try_parse_markdown(markdown)
@@ -145,7 +152,7 @@ class MermaidRoundTripTests(unittest.TestCase):
         self.assertEqual(reparsed, scenario)
 
     def test_generated_markdown_contains_diagram_and_table(self):
-        markdown = to_markdown(ethar_demo())
+        markdown = to_markdown(demo_scenario())
         self.assertIn("```mermaid", markdown)
         self.assertIn("flowchart TD", markdown)
         self.assertIn("| # | Step |", markdown)
@@ -203,6 +210,47 @@ class CsvImportTests(unittest.TestCase):
         self.assertEqual(reparsed, scenario)
 
 
+class CsvExportTests(unittest.TestCase):
+    def test_demo_scenario_round_trips_through_csv(self):
+        demo = demo_scenario()
+
+        ok, reparsed, report = try_parse_csv(to_csv(demo), name=demo.name)
+
+        self.assertTrue(ok, str(report))
+        self.assertFalse(report.has_errors)
+        self.assertEqual(reparsed, demo, "the exported CSV IS the configuration")
+
+    def test_export_writes_the_canonical_header(self):
+        first_line = to_csv(demo_scenario()).splitlines()[0]
+        self.assertEqual(
+            first_line,
+            "waitingClass,title,description,options,detectedClass,label,imageRef,modelRef,result")
+
+    def test_export_joins_options_on_semicolon(self):
+        from training_state_machine import TrainingScenario, TrainingStep
+        scenario = TrainingScenario(name="T", steps=(
+            TrainingStep(title="Pick", options=("Go", "Skip"), result=""),
+        ))
+
+        csv_text = to_csv(scenario)
+        self.assertIn("Go;Skip", csv_text)
+
+        ok, reparsed, _ = try_parse_csv(csv_text, name="T")
+        self.assertTrue(ok)
+        self.assertEqual(reparsed.steps[0].options, ("Go", "Skip"))
+
+    def test_export_quotes_cells_containing_commas(self):
+        from training_state_machine import TrainingScenario, TrainingStep
+        scenario = TrainingScenario(name="T", steps=(
+            TrainingStep(title="A", description="Good - the TV is on. Next, find the person",
+                         options=("Next",), result=""),
+        ))
+
+        ok, reparsed, report = try_parse_csv(to_csv(scenario), name="T")
+        self.assertTrue(ok, str(report))
+        self.assertEqual(reparsed, scenario, "commas inside cells survive the round trip")
+
+
 class ValidationReportTests(unittest.TestCase):
     def test_dead_end_result_is_a_warning(self):
         ok, _, report = try_parse_csv("title,result\nA,ghost\nB,\n")
@@ -211,7 +259,7 @@ class ValidationReportTests(unittest.TestCase):
         self.assertTrue(any("ghost" in m.message for m in report.messages))
 
     def test_valid_demo_has_no_warnings(self):
-        report = validate_scenario(ethar_demo())
+        report = validate_scenario(demo_scenario())
         self.assertFalse(report.has_errors)
         self.assertFalse(report.has_warnings)
         self.assertTrue(any(m.severity == ValidationSeverity.INFO for m in report.messages))

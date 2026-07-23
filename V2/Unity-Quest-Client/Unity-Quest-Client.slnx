@@ -1,7 +1,10 @@
 ﻿<Solution>
-  <Project Path="QuestVisionStream.Client.csproj" />
   <Project Path="Ethar.UXTraining.csproj" />
   <Project Path="QuestVisionStream.Unity.csproj" />
+  <Project Path="Ethar.DebugDrawingBBox.csproj" />
+  <Project Path="QuestVisionStream.Client.csproj" />
+  <Project Path="Ethar.TrainingStateMachine.csproj" />
   <Project Path="QuestVisionStream.Unity.Tags.Keijiro.csproj" />
   <Project Path="QuestVisionStream.Unity.Editor.csproj" />
+  <Project Path="Ethar.DebugDrawingBBox.Editor.csproj" />
 </Solution>
