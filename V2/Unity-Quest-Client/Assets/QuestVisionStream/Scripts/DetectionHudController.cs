@@ -37,7 +37,7 @@ namespace QuestVisionStream.Client
         private static readonly Color DimTextColor = new Color(1f, 1f, 1f, 0.6f);
 
         private IDetectionService detections;
-        private IDetectionRendererService renderer;
+        private IDetectionRendererService detectionRenderer;
         private IPoseTrackingService pose;
         private IAnchoredTagRenderModule anchored;
         private IStatusService status;
@@ -74,7 +74,7 @@ namespace QuestVisionStream.Client
             ISignalingService signalingService = null)
         {
             detections = detectionService;
-            renderer = rendererService;
+            detectionRenderer = rendererService;
             pose = poseService;
             anchored = anchoredModule;
             status = statusService;
@@ -161,7 +161,7 @@ namespace QuestVisionStream.Client
             var batch = arrival.Batch;
             var list = batch.Detections;
 
-            var mode = renderer != null ? renderer.ActiveModuleName : "?";
+            var mode = detectionRenderer != null ? detectionRenderer.ActiveModuleName : "?";
             var pitch = pose != null ? $"  ·  pitch {pose.CameraPitchCompensationDegrees:0.0}° (hold Y + L-stick)" : string.Empty;
             var tags = anchored != null && anchored.IsActiveRenderer
                 ? $"  ·  tags: {(anchored.PersistentTags ? "persistent" : "tracking")} (B to toggle)"

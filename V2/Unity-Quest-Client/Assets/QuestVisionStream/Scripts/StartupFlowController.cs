@@ -55,7 +55,7 @@ namespace QuestVisionStream.Client
         private IStatusService status;
         private IWebRTCService webrtc;
         private ISignalingService signaling;
-        private ICameraStreamService camera;
+        private ICameraStreamService cameraStream;
         private UxSettings uxSettings;
 
         private GameObject introRoot;
@@ -85,7 +85,7 @@ namespace QuestVisionStream.Client
             status = statusService;
             webrtc = webrtcService;
             signaling = signalingService;
-            camera = cameraService;
+            cameraStream = cameraService;
             uxSettings = settings != null ? settings : UxSettings.Defaults;
 
             conn = signaling.IsConnected ? Conn.Connected : Conn.Connecting;
@@ -153,14 +153,14 @@ namespace QuestVisionStream.Client
             }
 
             // Tier 1/2 — the platform gate (web: XR support; Unity: passthrough camera).
-            if (camera.State == CameraStreamState.Error)
+            if (cameraStream.State == CameraStreamState.Error)
             {
                 SetButton("Camera unavailable", false);
-                SetNote($"Passthrough camera isn't available — {camera.LastError ?? "check headset permissions."}", true);
+                SetNote($"Passthrough camera isn't available — {cameraStream.LastError ?? "check headset permissions."}", true);
                 return;
             }
 
-            if (camera.State != CameraStreamState.Active)
+            if (cameraStream.State != CameraStreamState.Active)
             {
                 SetButton("Checking camera…", false);
                 SetNote("Waiting for the passthrough camera…", false);
